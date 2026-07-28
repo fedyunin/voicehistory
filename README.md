@@ -10,7 +10,10 @@ network access in the project is a one-time download of the speech model.
 Built against a real archive: **5,372 recordings, 501 hours, 2019–2026**,
 exported from [Cube ACR](https://cubeacr.app/) as 8 kHz AMR files.
 
-<!-- Add a screenshot here: docs/screenshot.png -->
+![The archive view: years and people on the left, calls in the middle, player and synced transcript on the right](docs/01-archive.png)
+
+<sub>Screenshots use sample data. The interface follows your system light/dark
+setting — <a href="docs/01-archive-dark.png">dark version</a>.</sub>
 
 ## Quick start
 
@@ -46,6 +49,10 @@ becomes one contact.
 
 Then: browse by year or person, search across every transcript, and click any
 line of a transcript to jump to that moment in the audio.
+
+| Full-text search across every transcript | Naming the people behind the numbers |
+|---|---|
+| ![Search results with matches highlighted in context](docs/02-search.png) | ![The People dialog, listing contacts with editable names](docs/03-people.png) |
 
 ## How it works
 
@@ -120,11 +127,17 @@ to be load-bearing.
 
 **→ [docs/ENGINEERING.md](docs/ENGINEERING.md)**
 
-## Backups
+## Backups and maintenance
 
 Back up `archive/`, `derived/transcripts/` and `contacts.json`. Everything else
 is reproducible — playable copies by re-encoding, the index with `reindex`. The
 transcripts are worth keeping precisely because they represent days of compute.
+
+Settings shows what is on disk and what each destructive action would cost.
+Anything irreversible states what it destroys and what survives, and needs a
+phrase typed to confirm.
+
+![The Settings dialog showing disk usage and a danger zone where each action states what it destroys and what survives](docs/05-settings.png)
 
 ## Privacy and legality
 

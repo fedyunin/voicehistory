@@ -61,6 +61,9 @@ code { font-family: var(--mono); font-size: 0.9em; }
   background: var(--bg); color: var(--ink); font: inherit;
 }
 .searchbox input:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+/* Hide the native search clear icon — it collides with our own clear button. */
+.searchbox input::-webkit-search-cancel-button,
+.searchbox input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
 .searchbox button { position: absolute; right: 4px; top: 4px; }
 
 .top-actions { display: flex; gap: 8px; }
