@@ -50,13 +50,18 @@ const PUNCTUATION_SEED = process.env.VH_PROMPT ?? PROMPTS[LANGUAGE] ?? PROMPTS.e
  * re-transcription.
  */
 const HALLUCINATIONS = [
-  // Any mention of subtitles at all. Nobody says "subtitles" on a phone call,
-  // whereas whisper produces endless variants of subtitle credits:
-  // "Субтитры сделал X", "Спасибо за субтитры X", "Редактор субтитров X".
-  // Anchoring to the start of the segment missed the middle-of-phrase forms.
+  // Any mention of subtitles at all — nobody says "subtitles" on a phone call,
+  // whereas the model produces endless variants of subtitle credits: "subtitles
+  // by X", "thanks for the subtitles X", "subtitle editor X". Anchoring these to
+  // the start of a segment missed the mid-phrase forms, so the word alone is the
+  // signal.
   /субтитр/i,
   /subtitle/i,
+  // A captioner's name that recurs verbatim in the training data.
   /dimatorzok/i,
+  // Video sign-offs: "proofreader", "to be continued", "thanks for watching",
+  // "welcome to our channel", "subscribe", "leave a like", "see you in the next
+  // video", "enjoy the video", "this is the end of the video".
   /^корректор\b/i,
   /^продолжение следует[.…!]*$/i,
   /^спасибо за (просмотр|внимание)[.!…]*$/i,
@@ -68,10 +73,11 @@ const HALLUCINATIONS = [
   /до встречи в следующем видео/i,
   /^приятного просмотра/i,
   /^это конец видео/i,
-  // English equivalents, for archives in other languages
+  // English equivalents, for archives in other languages.
   /^thanks? for watching/i,
-  /^subtitles by\b/i,
+  /^subtitles? by\b/i,
   /^please subscribe/i,
+  /^like and subscribe/i,
 ];
 
 function isHallucination(text) {

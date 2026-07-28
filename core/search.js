@@ -83,10 +83,11 @@ export function recording(id) {
  * operators cannot break the query, and every term is prefix-matched.
  *
  * Terms are crudely stemmed by clipping the tail before prefix-matching. This
- * exists because heavily inflected languages break naive prefix search:
- * searching "теплица" would not match "теплицу" in the transcript, since the
- * words diverge at the final character. Clipping to "теплиц" finds every case
- * form.
+ * exists because heavily inflected languages break naive prefix search: a noun
+ * in the nominative will not match the same noun in the accusative, since the
+ * forms diverge at the final character. Clipping to the shared stem finds every
+ * case form — searching "teplitsa" (greenhouse) found nothing while transcripts
+ * plainly contained "teplitsu".
  *
  * A real stemmer would be more precise, but it would be a dependency and this
  * is not a precision problem: in a personal archive you are trying to find a
