@@ -1,0 +1,18 @@
+# Your archive — never commit personal recordings or transcripts.
+/archive/
+/derived/
+/db/
+/Import/*
+!/Import/.gitkeep
+
+# Your contact names are personal data.
+/contacts.json
+
+# Speech models are large binaries, fetched by `npm run setup`.
+/bin/models/
+/bin/whisper-cli
+/bin/whisper-cli.exe
+
+node_modules/
+*.log
+.DS_Store

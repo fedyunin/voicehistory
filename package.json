@@ -1,0 +1,47 @@
+{
+  "name": "voicehistory",
+  "version": "0.1.0",
+  "description": "Local-first archive for recorded phone calls: imports Cube ACR exports, transcribes speech with whisper.cpp, and makes years of conversations searchable. Nothing leaves your machine.",
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "start": "node cli/vh.js serve",
+    "serve": "node cli/vh.js serve",
+    "import": "node cli/vh.js import",
+    "transcribe": "node cli/vh.js transcribe",
+    "status": "node cli/vh.js status",
+    "reindex": "node cli/vh.js reindex",
+    "doctor": "node cli/vh.js doctor",
+    "jobs": "node cli/vh.js jobs",
+    "watch": "node cli/vh.js watch"
+  },
+  "keywords": [
+    "whisper",
+    "whisper-cpp",
+    "transcription",
+    "speech-to-text",
+    "call-recording",
+    "archive",
+    "sqlite",
+    "fts5",
+    "local-first",
+    "privacy"
+  ],
+  "author": "Alexey Fedyunin <fedyunin@ipoint.ru>",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "better-sqlite3": "^13.0.1"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fedyunin/voicehistory.git"
+  },
+  "bugs": {
+    "url": "https://github.com/fedyunin/voicehistory/issues"
+  },
+  "homepage": "https://github.com/fedyunin/voicehistory#readme"
+}

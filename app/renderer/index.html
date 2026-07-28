@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Voice History</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <span class="dot"></span>
+    <span>Voice History</span>
+  </div>
+
+  <div class="searchbox">
+    <input id="q" type="search" placeholder="Search transcripts…  try: airport, birthday, tomorrow" autocomplete="off">
+    <button id="clear" class="ghost" title="Clear" hidden>×</button>
+  </div>
+
+  <div class="top-actions">
+    <button id="btn-import" class="primary">Import</button>
+    <button id="btn-jobs" class="ghost">Transcribe</button>
+    <button id="btn-people" class="ghost">People</button>
+    <button id="btn-settings" class="ghost" title="Settings and maintenance">⚙</button>
+  </div>
+</header>
+
+<div id="banner" class="banner" hidden></div>
+
+<div id="progress" class="progress" hidden>
+  <div class="progress-head">
+    <span id="prog-label">—</span>
+    <span id="prog-count" class="muted"></span>
+    <button id="prog-cancel" class="ghost small">Stop</button>
+  </div>
+  <div class="bar"><div id="prog-fill"></div></div>
+  <div id="prog-file" class="muted tiny"></div>
+</div>
+
+<main class="layout">
+
+  <aside class="side">
+    <section>
+      <h3>Years</h3>
+      <ul id="years" class="list-plain"></ul>
+    </section>
+    <section>
+      <h3>People</h3>
+      <ul id="contacts" class="list-plain"></ul>
+    </section>
+  </aside>
+
+  <section class="middle">
+    <div id="list-head" class="list-head muted"></div>
+    <ul id="calls" class="calls"></ul>
+    <button id="more" class="ghost wide" hidden>Load more</button>
+  </section>
+
+  <section class="detail" id="detail">
+    <div class="empty-state">
+      <p>Pick a recording from the list.</p>
+      <p class="muted tiny">Transcripts are synced to the audio — click any line to jump to that moment.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer id="foot" class="foot muted tiny"></footer>
+
+<!-- Import dialog -->
+<dialog id="dlg-import">
+  <h2>Import recordings</h2>
+  <p class="muted tiny">Files are filed into <code>archive/YEAR/YEAR-MONTH/</code>. Duplicates are detected by checksum, so you can drop the same export in as many times as you like.</p>
+
+  <label class="field">
+    <span>Source</span>
+    <select id="imp-src"></select>
+  </label>
+
+  <label class="field" id="imp-custom-field" hidden>
+    <span>Folder path</span>
+    <input id="imp-custom" type="text" placeholder="/Users/you/Documents/CubeCallRecorder/All" spellcheck="false">
+    <span id="imp-custom-hint" class="hint muted tiny"></span>
+  </label>
+
+  <p class="muted tiny" id="imp-props-note">Sidecar <code>.props</code> metadata is picked up automatically — including when you drop in only a <code>.props</code> folder for recordings already imported.</p>
+
+  <fieldset class="field">
+    <span>What to do with the source files</span>
+    <label class="radio"><input type="radio" name="mode" value="copy" checked>
+      <span><b>Copy</b> — originals stay where they are, acting as a backup. <i>Recommended for the first import.</i></span></label>
+    <label class="radio"><input type="radio" name="mode" value="move">
+      <span><b>Move</b> — the source folder empties itself. Convenient for routine phone exports.</span></label>
+  </fieldset>
+
+  <div class="dlg-actions">
+    <button id="imp-cancel" class="ghost">Cancel</button>
+    <button id="imp-go" class="primary">Start import</button>
+  </div>
+</dialog>
+
+<!-- Transcription dialog -->
+<dialog id="dlg-jobs">
+  <h2>Transcription</h2>
+  <p id="jobs-summary" class="muted tiny"></p>
+
+  <fieldset class="field">
+    <span>Order</span>
+    <label class="radio"><input type="radio" name="order" value="named" checked>
+      <span><b>People first</b> — recordings where the other party is in your address book rather than a bare number. The voices that matter get done first.</span></label>
+    <label class="radio"><input type="radio" name="order" value="newest">
+      <span><b>Newest first</b> — reverse chronological order.</span></label>
+  </fieldset>
+
+  <p class="muted tiny">The queue lives in the database: stop any time and resume later from the same place.</p>
+
+  <div class="dlg-actions">
+    <button id="jobs-reindex" class="ghost" title="Rebuild the database from files on disk">Rebuild index</button>
+    <button id="jobs-cancel" class="ghost">Close</button>
+    <button id="jobs-go" class="primary">Start</button>
+  </div>
+</dialog>
+
+<!-- Contacts dialog -->
+<dialog id="dlg-people" class="wide-dlg">
+  <h2>People</h2>
+  <p class="muted tiny">Import an address book exported from your phone, or type names in by hand. Names are kept in <code>contacts.json</code> at the archive root, so they survive a rebuild — and you can edit that file directly if you prefer.</p>
+
+  <div class="vcf-row">
+    <label class="btn-file">
+      <input id="vcf" type="file" accept=".vcf,text/vcard,text/directory" hidden>
+      <span>Import .vcf…</span>
+    </label>
+    <span id="vcf-result" class="muted tiny"></span>
+  </div>
+
+  <div class="people-head muted tiny">
+    <span>Name</span><span>Number</span><span>Calls</span>
+  </div>
+  <div id="people-list" class="people-list"></div>
+
+  <div class="dlg-actions">
+    <button id="people-close" class="primary">Done</button>
+  </div>
+</dialog>
+
+<!-- Settings / maintenance -->
+<dialog id="dlg-settings" class="wide-dlg">
+  <h2>Settings</h2>
+
+  <div id="set-usage" class="usage"></div>
+
+  <h3 class="danger-title">Danger zone</h3>
+  <p class="muted tiny">Each action says what it destroys and what survives. Audio is irreplaceable, transcripts cost days of compute, the index costs seconds.</p>
+  <div id="set-actions" class="actions-list"></div>
+
+  <div class="dlg-actions">
+    <button id="set-close" class="primary">Close</button>
+  </div>
+</dialog>
+
+<script type="module" src="/ui.js"></script>
+</body>
+</html>
