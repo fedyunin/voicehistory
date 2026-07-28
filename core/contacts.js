@@ -11,24 +11,13 @@
 // makes address-book import work: a phone exports `+X XXX XXX-XX-XX` while
 // filenames carry bare digits.
 
-/**
- * National numbering plan, used to interpret numbers written in local form.
- * Deliberately configurable rather than hardcoded, so the project is not tied
- * to the country its author happened to live in:
- *
- *   VH_COUNTRY_CODE   international dialling code, no '+'        (default 7)
- *   VH_TRUNK_PREFIX   domestic long-distance prefix, '' if none  (default 8)
- *   VH_NSN_LENGTH     digits in a national subscriber number     (default 10)
- *
- * Examples of other plans: US/Canada → code 1, no trunk prefix, 10 digits.
- * UK → code 44, trunk prefix 0, 10 digits. Germany → code 49, trunk prefix 0,
- * but variable length, so numbers there are better left in international form.
- */
-const PLAN = {
-  countryCode: String(process.env.VH_COUNTRY_CODE ?? '7').replace(/\D/g, '') || '7',
-  trunkPrefix: String(process.env.VH_TRUNK_PREFIX ?? '8').replace(/\D/g, ''),
-  nsnLength: Number(process.env.VH_NSN_LENGTH ?? 10),
-};
+// The numbering plan is configuration, not a constant, so the project is not
+// tied to the country its author happened to live in. See core/config.js —
+// set it in config.json or override per command with VH_COUNTRY_CODE and
+// friends. Other plans: US/Canada → code 1, no trunk prefix, 10 digits.
+// UK → code 44, trunk prefix 0. Germany has variable-length numbers, so those
+// are better left in international form.
+import { NUMBERING as PLAN } from './config.js';
 
 const SHORTCODE_MAX = 6;
 

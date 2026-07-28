@@ -86,21 +86,42 @@ costs one `reindex` instead of re-transcribing days of audio.
 
 ## Configuration
 
-Nothing about language or phone numbering is hardcoded. Defaults match the
-archive this was built against.
-
-| Variable | Default | Meaning |
-|---|---|---|
-| `VH_LANGUAGE` | `ru` | Spoken language, or `auto` to detect |
-| `VH_PROMPT` | Russian sample | Priming prompt — must be in the target language |
-| `VH_COUNTRY_CODE` | `7` | Dialling code for interpreting local numbers |
-| `VH_TRUNK_PREFIX` | `8` | Domestic long-distance prefix, empty if none |
-| `VH_NSN_LENGTH` | `10` | Digits in a national subscriber number |
-| `VH_ROOT` | project folder | Archive location |
+Settings live in **`config.json`** at the archive root. Copy the template and
+edit it:
 
 ```bash
-VH_LANGUAGE=en VH_COUNTRY_CODE=1 VH_TRUNK_PREFIX= npm start
+cp config.example.json config.json
 ```
+
+```json
+{
+  "language": "en",
+  "model": "large-v3-turbo",
+  "prompt": null,
+  "silencePeakDb": -60,
+  "numbering": { "countryCode": "1", "trunkPrefix": "", "nsnLength": 10 }
+}
+```
+
+Every key is optional. Nothing about the language or the phone numbering plan is
+hardcoded; the defaults simply match the archive this was built against
+(Russian, country code 7). `prompt` is the priming text that makes the
+recognizer produce punctuation at all — it **must** be written in the language
+you are transcribing, and `null` selects a built-in sample.
+
+For a one-off run, an environment variable overrides the file:
+
+```bash
+VH_LANGUAGE=en npm run transcribe
+```
+
+`VH_LANGUAGE`, `VH_MODEL`, `VH_PROMPT`, `VH_SILENCE_PEAK_DB`,
+`VH_COUNTRY_CODE`, `VH_TRUNK_PREFIX`, `VH_NSN_LENGTH`. The archive location is
+env-only — `VH_ROOT` — since a file inside the archive cannot say where the
+archive is.
+
+Settings shows every value in effect and whether it came from the file, the
+environment or a default.
 
 ## Commands
 

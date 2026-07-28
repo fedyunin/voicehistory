@@ -26,7 +26,7 @@
     "local-first",
     "privacy"
   ],
-  "author": "Alexey Fedyunin <fedyunin@ipoint.ru>",
+  "author": "Alexey Fedyunin <alexey@cranfan.ru>",
   "license": "MIT",
   "type": "module",
   "private": true,

@@ -9,6 +9,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
+import { SILENCE_PEAK_DB } from './config.js';
 
 const run = promisify(execFile);
 
@@ -40,8 +41,8 @@ export const PLAYBACK_FORMAT = 'm4a';
  */
 const SPEECH_FILTER = 'speechnorm';
 
-/** Anything peaking below this is digital silence, not quiet speech. */
-export const SILENCE_MAX_DB = -60;
+/** Anything peaking below this is digital silence, not quiet speech. Configurable. */
+export const SILENCE_MAX_DB = SILENCE_PEAK_DB;
 
 /**
  * Peak and mean level in dBFS.

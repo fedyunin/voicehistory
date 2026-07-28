@@ -5,6 +5,9 @@
 /Import/*
 !/Import/.gitkeep
 
+# Your own settings; config.example.json is the committed template.
+/config.json
+
 # Your contact names are personal data.
 /contacts.json
 

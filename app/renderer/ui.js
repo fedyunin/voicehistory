@@ -236,7 +236,7 @@ function wire() {
 /* ======================= settings ======================= */
 
 async function openSettings() {
-  const { usage, actions } = await api.maintenance();
+  const { usage, actions, config } = await api.maintenance();
 
   const u = $('set-usage');
   u.replaceChildren();
@@ -251,6 +251,22 @@ async function openSettings() {
   line('Transcripts', `${usage.transcripts.files} files · ${fmtBytes(usage.transcripts.bytes)}`);
   line('Search index', fmtBytes(usage.index.bytes));
   line('Contact names', usage.names ? 'contacts.json present' : 'none');
+
+  // Where each value came from matters as much as the value: it answers
+  // "why is it doing that" without hunting through the code.
+  const c = $('set-config');
+  c.replaceChildren();
+  for (const [key, { value, from }] of Object.entries(config.values)) {
+    const row = el('div', 'usage-row');
+    row.append(el('span', 'muted', key));
+    const right = el('span', '');
+    right.append(el('span', '', esc(String(value))), el('span', 'from', esc(from)));
+    row.append(right);
+    c.append(row);
+  }
+  if (!config.configFileExists) {
+    c.append(el('div', 'usage-row muted tiny', '<span>no config.json — all values are defaults</span><span></span>'));
+  }
 
   const list = $('set-actions');
   list.replaceChildren();

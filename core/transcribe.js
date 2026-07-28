@@ -10,14 +10,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { paths } from './paths.js';
 import { assertModelAllowed } from './license.js';
+import { LANGUAGE as CONFIGURED_LANGUAGE, MODEL, PROMPT } from './config.js';
 
 const run = promisify(execFile);
 
-export const DEFAULT_MODEL = 'large-v3-turbo';
+export const DEFAULT_MODEL = MODEL;
 const THREADS = Math.max(4, Math.min(8, os.cpus().length - 2));
 
-/** Spoken language of the recordings. Override with VH_LANGUAGE ('auto' works). */
-export const LANGUAGE = process.env.VH_LANGUAGE ?? 'ru';
+export const LANGUAGE = CONFIGURED_LANGUAGE;
 
 /**
  * Priming prompt. Established by measurement: when decoding WITH timestamps
@@ -29,15 +29,15 @@ export const LANGUAGE = process.env.VH_LANGUAGE ?? 'ru';
  * reading these conversations is the entire point of the archive.
  *
  * The seed MUST be written in the language being transcribed, and should read
- * like ordinary phone conversation. Override with VH_PROMPT; the default below
- * is Russian, matching the archive this was built against.
+ * like ordinary phone conversation. Set `prompt` in config.json to supply your
+ * own; the samples below are used when you do not.
  */
 const PROMPTS = {
   ru: 'Здравствуйте! Да, конечно. Хорошо, я перезвоню вам позже. Как дела?',
   en: 'Hello! Yes, of course. All right, I will call you back later. How are you?',
 };
 
-const PUNCTUATION_SEED = process.env.VH_PROMPT ?? PROMPTS[LANGUAGE] ?? PROMPTS.en;
+const PUNCTUATION_SEED = PROMPT ?? PROMPTS[CONFIGURED_LANGUAGE] ?? PROMPTS.en;
 
 /**
  * Whisper hallucinations on noise and silence. The model was trained on

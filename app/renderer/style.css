@@ -212,7 +212,13 @@ dialog.wide-dlg { max-width: 660px; }
 .usage-row + .usage-row { border-top: 1px solid var(--line); }
 .usage-row span:last-child { font-variant-numeric: tabular-nums; text-align: right; word-break: break-all; }
 
+.sect-title { margin: 22px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .danger-title { margin: 22px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: #b4552f; }
+.usage-row .from {
+  display: inline-block; margin-left: 9px; padding: 0 6px; border-radius: 20px;
+  border: 1px solid var(--line); font-size: 10.5px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .04em; vertical-align: 1px;
+}
 .actions-list { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
 .action-box { border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; }
 .action-box.danger { border-color: rgba(180, 85, 47, .45); }

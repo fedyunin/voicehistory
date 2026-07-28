@@ -19,6 +19,7 @@ import { reindex } from '../core/reindex.js';
 import { DEFAULT_MODEL, modelAvailable } from '../core/transcribe.js';
 import { vcardsToOverrides } from '../core/contactbook.js';
 import * as maintenance from '../core/maintenance.js';
+import { effective } from '../core/config.js';
 
 const WEB = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'app', 'renderer');
 
@@ -157,7 +158,7 @@ async function api(req, res, url) {
       const specs = Object.fromEntries(
         Object.entries(maintenance.ACTIONS).map(([k, v]) => [k, { ...v, needsConfirm: Boolean(v.confirm) }]),
       );
-      return json(res, 200, { usage: maintenance.usage(), actions: specs });
+      return json(res, 200, { usage: maintenance.usage(), actions: specs, config: effective() });
     }
 
     case 'maintenance/run': {
