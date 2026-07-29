@@ -59,7 +59,7 @@ near-end speaker is loud, the far-end speaker quiet — and evening that out is 
 actual win.
 
 Normalization is applied to the playable copies too, since the quiet party is
-often barely audible in the raw file. Originals in `archive/` are never modified.
+often barely audible in the raw file. Originals in `recordings/` are never modified.
 
 ---
 
@@ -134,8 +134,8 @@ work at all: a phone exports numbers grouped and spaced in international form
 while filenames carry bare local digits. Both sides go through the same
 normalizer.
 
-Names assigned by hand or imported from a `.vcf` live in `contacts.json` at the
-archive root, keyed by normalized number:
+Names assigned by hand or imported from a `.vcf` live in `contacts.json` in the
+archive, keyed by normalized number:
 
 ```json
 { "+15550001234": "Mom", "+15550005678": "Sam" }
@@ -158,7 +158,7 @@ not implemented.
 ## Concurrency
 
 Both the server and the CLI can start jobs, so writes are guarded by an advisory
-lock at `db/.lock` holding the owning pid. A second writer is refused with a
+lock at `.tmp/writer.lock` in the archive, holding the owning pid. A second writer is refused with a
 message pointing at `watch`; readers are never blocked.
 
 This also makes crash recovery safe. A recording is flagged `running` while the
@@ -195,8 +195,10 @@ rather than something to wait on.
 
 ## Portability
 
-Paths in the database are relative, so the whole folder can be moved to another
-disk or machine and still work. `VH_ROOT` runs the code from outside the archive.
+Paths in the database are relative, and the archive carries its own settings and
+format version, so the folder can be moved to another disk or machine — or opened
+by a later version of the app — and still work. That is the point of keeping the
+archive entirely separate from the checkout.
 
 The UI talks to the backend through exactly one file,
 `app/renderer/api.js`. Wrapping this in Electron means reimplementing that single

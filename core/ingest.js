@@ -10,14 +10,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import * as db from './db.js';
-import { paths, rel, abs, archiveDirFor, ensureDirs } from './paths.js';
+import { paths, rel, abs, archiveDirFor, mirrorPath, ensureDirs } from './paths.js';
 import { parseFilename, parseProps, propsPathFor } from './parse.js';
 import { normalizeContact } from './contacts.js';
 import { collectAudioFiles, sha256File, transferFile, freePath } from './scan.js';
 import {
   toPlayable, toWhisperWav, probeDurationMs, measureLevelDb, isSilent, PLAYBACK_FORMAT,
 } from './audio.js';
-import { transcribeWav, filterSegments, DEFAULT_MODEL } from './transcribe.js';
+import { transcribeWav, filterSegments } from './transcribe.js';
 import { progress, logLine } from './events.js';
 import * as lock from './lock.js';
 
@@ -101,7 +101,7 @@ async function runImport(sourceDir, concurrency, mode) {
       transferFile(file, dest, mode);
 
       // Move the .props sidecar next to the audio, into
-      // archive/YYYY/YYYY-MM/.props/. Without this, "the database is
+      // recordings/YYYY/YYYY-MM/.props/. Without this, "the database is
       // rebuildable" would be a lie: call direction and duration exist
       // nowhere else.
       if (fs.existsSync(propsFile)) {
@@ -130,11 +130,7 @@ async function runImport(sourceDir, concurrency, mode) {
 
       // Playable copy: no browser and no webview can play AMR.
       try {
-        const playable = path.join(
-          paths.audio,
-          ...rel(destDir).split('/').slice(1),
-          `${path.basename(dest).replace(/\.[^.]+$/, '')}.${PLAYBACK_FORMAT}`,
-        );
+        const playable = mirrorPath(paths.audio, rel(dest), PLAYBACK_FORMAT);
         await toPlayable(dest, playable);
         db.setAudioPath(id, rel(playable));
       } catch (e) {
@@ -256,7 +252,7 @@ export async function transcribePending(opts = {}) {
 }
 
 async function runTranscribe({
-  model = DEFAULT_MODEL, limit = Infinity, order = 'named', shouldStop = () => false,
+  model = undefined, limit = Infinity, order = 'named', shouldStop = () => false,
 } = {}) {
   const pendingTotal = db.stats().byStatus.find((s) => s.s === 'pending')?.n ?? 0;
   const total = Math.min(pendingTotal, limit);
@@ -349,10 +345,9 @@ async function runTranscribe({
 
 const tally = (r) => r.imported + r.duplicates + r.failed;
 
-/** Mirrors archive/YYYY/YYYY-MM/x.amr → derived/transcripts/YYYY/YYYY-MM/x.json */
+/** recordings/YYYY/YYYY-MM/x.amr → transcripts/YYYY/YYYY-MM/x.json */
 function transcriptPathFor(rec) {
-  const relDir = path.dirname(rec.rel_path).split('/').slice(1).join('/');
-  return path.join(paths.transcripts, relDir, `${rec.orig_name.replace(/\.[^.]+$/, '')}.json`);
+  return mirrorPath(paths.transcripts, rec.rel_path, 'json');
 }
 
 function isInside(file, dir) {

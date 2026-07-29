@@ -3,21 +3,37 @@
 // main.js would — which is why it contains no logic, only argument parsing
 // and progress printing.
 import path from 'node:path';
-import { paths, ensureDirs } from '../core/paths.js';
+import { paths, hasRoot, appPaths } from '../core/paths.js';
 import { bus } from '../core/events.js';
 import * as db from '../core/db.js';
 import { importFiles, transcribePending, scanInbox } from '../core/ingest.js';
 import { reindex } from '../core/reindex.js';
 import { contacts, years } from '../core/search.js';
 import { ffmpegAvailable } from '../core/audio.js';
-import { whisperAvailable, modelAvailable, modelPath, DEFAULT_MODEL } from '../core/transcribe.js';
+import { whisperAvailable, modelAvailable, modelPath } from '../core/transcribe.js';
 import { tier } from '../core/license.js';
 import { serve } from './server.js';
+import * as session from '../core/session.js';
+import * as appsettings from '../core/appsettings.js';
+import * as config from '../core/config.js';
 
 const [cmd, ...rest] = process.argv.slice(2);
 const flags = parseFlags(rest);
 
 attachProgress();
+
+// Every command except these operates on an archive, so open the one from last
+// session first. `serve` handles its own, since it can start without one.
+const NEEDS_ARCHIVE = new Set(['import', 'transcribe', 'status', 'reindex', 'jobs', 'watch']);
+if (NEEDS_ARCHIVE.has(cmd)) {
+  const restored = session.restoreArchive();
+  if (!restored || restored.missing) {
+    console.error(
+      `\n✖ No archive is open.\n\n  Choose one in the interface (npm start), or point at it directly:\n` +
+      `    VH_ROOT=/path/to/archive node cli/vh.js ${cmd}\n`);
+    process.exit(1);
+  }
+}
 
 try {
   switch (cmd) {
@@ -29,6 +45,7 @@ try {
     case 'jobs':       cmdJobs(); break;
     case 'watch':      await cmdWatch(); break;
     case 'serve':      cmdServe(); break;
+    case 'archive':    cmdArchive(); break;
     default:           usage();
   }
 } catch (e) {
@@ -42,14 +59,15 @@ try {
 /* ---------------- commands ---------------- */
 
 async function doctor() {
-  ensureDirs();
+  const restored = session.restoreArchive();
   const rows = [
-    ['archive root', paths.root],
+    ['archive', restored && !restored.missing ? paths.root : 'none open — run npm start to choose one'],
+    ['app settings', appsettings.settingsFile()],
     ['ffmpeg', (await ffmpegAvailable()) ? 'found' : 'MISSING — brew install ffmpeg'],
     ['whisper-cli', (await whisperAvailable()) ? 'found' : 'MISSING — brew install whisper-cpp'],
-    [`model ${DEFAULT_MODEL}`, modelAvailable() ? 'found' : `MISSING — run: npm run setup`],
+    [`model ${config.MODEL}`, modelAvailable() ? 'found' : 'MISSING — run: npm run setup'],
     ['tier', tier()],
-    ['files in Import/', String(scanInbox().length)],
+    ['files waiting in inbox/', hasRoot() ? String(scanInbox().length) : '—'],
   ];
   for (const [k, v] of rows) console.log(`${k.padEnd(24)} ${v}`);
 }
@@ -143,6 +161,23 @@ async function cmdWatch() {
   }
 }
 
+/** Show or change which archive the CLI and interface open by default. */
+function cmdArchive() {
+  const target = flags._[0];
+  if (target) {
+    const opened = session.openArchive(target);
+    console.log(`${opened.created ? 'Created' : 'Opened'} archive at ${opened.root}`);
+    return;
+  }
+  const restored = session.restoreArchive();
+  const st = session.archiveState();
+  console.log(`current   ${st.open ? st.root : 'none'}`);
+  if (restored?.missing) console.log(`          (remembered but unavailable: ${restored.root})`);
+  if (st.formatVersion) console.log(`format    ${st.formatVersion}`);
+  for (const r of st.recents) console.log(`recent    ${r}`);
+  console.log(`\nOpen another:  node cli/vh.js archive /path/to/folder`);
+}
+
 function cmdServe() {
   serve(Number(flags.port ?? 4321));
 }
@@ -150,9 +185,10 @@ function cmdServe() {
 function usage() {
   console.log(`voicehistory — a local archive of recorded phone calls
 
-  node cli/vh.js serve [--port 4321]        open the archive in a browser
+  node cli/vh.js serve [--port 4321]        open the interface in a browser
+  node cli/vh.js archive [DIR]              show, or open/create, an archive folder
   node cli/vh.js doctor                     check the environment
-  node cli/vh.js import [dir] [--copy]      import (defaults to Import/)
+  node cli/vh.js import [dir] [--copy]      import (defaults to the archive's inbox/)
   node cli/vh.js transcribe [--limit N] [--order named|newest]
   node cli/vh.js status                     archive summary
   node cli/vh.js reindex                    rebuild the database from files

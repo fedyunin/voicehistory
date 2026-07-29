@@ -8,16 +8,17 @@ import { promisify } from 'node:util';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { paths } from './paths.js';
+import { paths, appPaths } from './paths.js';
 import { assertModelAllowed } from './license.js';
-import { LANGUAGE as CONFIGURED_LANGUAGE, MODEL, PROMPT } from './config.js';
+import * as config from './config.js';
+
+const tmpDir = () => paths.tmp;
 
 const run = promisify(execFile);
 
-export const DEFAULT_MODEL = MODEL;
+/** Read through a function, not a constant: the archive can change at runtime. */
+export const defaultModel = () => config.MODEL;
 const THREADS = Math.max(4, Math.min(8, os.cpus().length - 2));
-
-export const LANGUAGE = CONFIGURED_LANGUAGE;
 
 /**
  * Priming prompt. Established by measurement: when decoding WITH timestamps
@@ -29,15 +30,15 @@ export const LANGUAGE = CONFIGURED_LANGUAGE;
  * reading these conversations is the entire point of the archive.
  *
  * The seed MUST be written in the language being transcribed, and should read
- * like ordinary phone conversation. Set `prompt` in config.json to supply your
- * own; the samples below are used when you do not.
+ * like ordinary phone conversation. Set it in the archive's settings to supply
+ * your own; the samples below are used when you do not.
  */
 const PROMPTS = {
   ru: 'Здравствуйте! Да, конечно. Хорошо, я перезвоню вам позже. Как дела?',
   en: 'Hello! Yes, of course. All right, I will call you back later. How are you?',
 };
 
-const PUNCTUATION_SEED = PROMPT ?? PROMPTS[CONFIGURED_LANGUAGE] ?? PROMPTS.en;
+const punctuationSeed = () => config.PROMPT ?? PROMPTS[config.LANGUAGE] ?? PROMPTS.en;
 
 /**
  * Whisper hallucinations on noise and silence. The model was trained on
@@ -90,7 +91,7 @@ function isHallucination(text) {
 /**
  * Artifact removal. Applied at INDEX time, not at transcription time — on
  * purpose. Raw whisper output costs days of compute and is kept in
- * derived/transcripts/ forever, whereas the hallucination list will keep
+ * transcripts/ forever, whereas the hallucination list will keep
  * growing. Improving it must cost one `reindex`, not a full re-transcription.
  *
  * @returns {{segments: Array, filtered: number}}
@@ -109,15 +110,15 @@ export function filterSegments(rawSegments) {
 
 /** Prefer a binary shipped next to the app, fall back to PATH. */
 export function resolveBinary() {
-  const bundled = path.join(paths.bin, process.platform === 'win32' ? 'whisper-cli.exe' : 'whisper-cli');
+  const bundled = path.join(appPaths.bin, process.platform === 'win32' ? 'whisper-cli.exe' : 'whisper-cli');
   return fs.existsSync(bundled) ? bundled : 'whisper-cli';
 }
 
-export function modelPath(model = DEFAULT_MODEL) {
-  return path.join(paths.models, `ggml-${model}.bin`);
+export function modelPath(model = config.MODEL) {
+  return path.join(appPaths.models, `ggml-${model}.bin`);
 }
 
-export function modelAvailable(model = DEFAULT_MODEL) {
+export function modelAvailable(model = config.MODEL) {
   return fs.existsSync(modelPath(model));
 }
 
@@ -131,13 +132,13 @@ export async function whisperAvailable() {
  *   Segments are RAW; run them through filterSegments() before indexing.
  */
 export async function transcribeWav(wavPath, {
-  model = DEFAULT_MODEL, language = LANGUAGE, prompt = PUNCTUATION_SEED,
+  model = config.MODEL, language = config.LANGUAGE, prompt = punctuationSeed(),
 } = {}) {
   assertModelAllowed(model);
   const mp = modelPath(model);
   if (!fs.existsSync(mp)) throw new Error(`Model not found: ${mp}`);
 
-  const outBase = path.join(paths.tmp, `w_${process.pid}_${path.basename(wavPath, '.wav')}`);
+  const outBase = path.join(tmpDir(), `w_${process.pid}_${path.basename(wavPath, '.wav')}`);
   const args = [
     '-m', mp,
     '-f', wavPath,

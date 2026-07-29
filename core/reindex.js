@@ -1,13 +1,13 @@
 // Full rebuild of the database from the files on disk.
 //
 // This is not a break-glass recovery tool — it is the check that keeps the
-// project's central invariant honest: SQLite holds nothing that archive/ and
-// derived/ do not. As long as reindex reproduces the database exactly, the
+// project's central invariant honest: SQLite holds nothing that recordings/ and
+// transcripts/ do not. As long as reindex reproduces the database exactly, the
 // schema can change freely and no user data is ever at risk.
 import fs from 'node:fs';
 import path from 'node:path';
 import * as db from './db.js';
-import { paths, rel, ensureDirs } from './paths.js';
+import { paths, rel, mirrorPath, ensureDirs } from './paths.js';
 import { parseFilename, parseProps, propsPathFor } from './parse.js';
 import { normalizeContact } from './contacts.js';
 import { collectAudioFiles, sha256File } from './scan.js';
@@ -33,7 +33,7 @@ export async function reindex() {
 async function runReindex() {
   db.truncateContent();
 
-  const files = collectAudioFiles(paths.archive);
+  const files = collectAudioFiles(paths.recordings);
   progress({ phase: 'reindex', done: 0, total: files.length });
   const result = { total: files.length, rows: 0, transcripts: 0, silent: 0, failed: 0 };
   // Recorded like any other long job so `vh jobs` and `vh watch` can see it.
@@ -52,11 +52,8 @@ async function runReindex() {
       const props = fs.existsSync(propsFile) ? parseProps(fs.readFileSync(propsFile, 'utf8')) : null;
 
       const contactId = db.upsertContact(normalizeContact(meta.rawContact, props?.callee ?? null));
-      const stem = path.basename(file).replace(/\.[^.]+$/, '');
-      const relDir = path.dirname(rel(file)).split('/').slice(1).join('/');
-
-      const playable = path.join(paths.audio, relDir, `${stem}.${PLAYBACK_FORMAT}`);
-      const tPath = path.join(paths.transcripts, relDir, `${stem}.json`);
+      const playable = mirrorPath(paths.audio, rel(file), PLAYBACK_FORMAT);
+      const tPath = mirrorPath(paths.transcripts, rel(file), 'json');
 
       // Same fallback as import: recordings exported without a .props sidecar
       // have no stored duration, so probe the file. Skipping this silently

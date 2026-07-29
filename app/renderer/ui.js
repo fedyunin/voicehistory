@@ -18,6 +18,11 @@ boot();
 
 async function boot() {
   api.subscribe(onProgress, onJob);
+
+  // Nothing can be listed until a folder is chosen, so that comes first.
+  const arch = await api.archive();
+  if (!arch.open) return firstRun(arch);
+
   await Promise.all([refreshStats(), loadSidebar()]);
   await loadList(true);
   wire();
@@ -233,10 +238,78 @@ function wire() {
   $('vcf').onchange = importVCard;
 }
 
+/* ======================= first run ======================= */
+
+function firstRun(arch) {
+  document.querySelector('.layout').hidden = true;
+  document.querySelector('.top').hidden = true;
+  $('foot').hidden = true;
+  $('firstrun').hidden = false;
+
+  const input = $('fr-path');
+  const hint = $('fr-hint');
+  const go = $('fr-go');
+  input.value = arch.suggestion ?? '';
+
+  let seq = 0;
+  const check = async () => {
+    const dir = input.value.trim();
+    const mine = ++seq;
+    if (!dir) { hint.textContent = 'Paste or type a folder path.'; go.disabled = true; return; }
+    try {
+      const r = await api.archiveInspect(dir);
+      if (mine !== seq) return;
+      hint.textContent = describeFolder(r);
+      go.disabled = Boolean(r.error);
+      go.textContent = r.isArchive ? 'Open this archive' : 'Create archive here';
+    } catch (e) {
+      if (mine === seq) { hint.textContent = e.message; go.disabled = true; }
+    }
+  };
+
+  let t;
+  input.oninput = () => { clearTimeout(t); t = setTimeout(check, 250); };
+  input.onkeydown = (e) => { if (e.key === 'Enter' && !go.disabled) go.click(); };
+  go.onclick = async () => {
+    go.disabled = true;
+    try {
+      await api.archiveOpen(input.value.trim());
+      location.reload();
+    } catch (e) { hint.textContent = e.message; go.disabled = false; }
+  };
+
+  if (arch.recents.length) {
+    $('fr-recents').hidden = false;
+    const ul = $('fr-recents-list');
+    ul.replaceChildren();
+    for (const p of arch.recents) {
+      const li = el('li');
+      li.append(el('span', 'name', esc(p)));
+      li.onclick = () => { input.value = p; check(); };
+      ul.append(li);
+    }
+  }
+  check();
+  input.focus();
+}
+
+/** One sentence saying exactly what pressing the button will do. */
+function describeFolder(r) {
+  if (r.error) return r.error;
+  if (r.isArchive) {
+    return r.recordings
+      ? `Existing archive — ${r.recordings} recordings, format ${r.formatVersion}.`
+      : `Existing archive, currently empty (format ${r.formatVersion}).`;
+  }
+  if (!r.exists) return 'Folder does not exist yet — it will be created.';
+  if (r.empty) return 'Empty folder — a new archive will be set up here.';
+  return 'Folder has other files in it; archive folders will be added alongside them.';
+}
+
 /* ======================= settings ======================= */
 
 async function openSettings() {
-  const { usage, actions, config } = await api.maintenance();
+  const [{ usage, actions, config }, arch] = await Promise.all([api.maintenance(), api.archive()]);
 
   const u = $('set-usage');
   u.replaceChildren();
@@ -267,6 +340,80 @@ async function openSettings() {
   if (!config.configFileExists) {
     c.append(el('div', 'usage-row muted tiny', '<span>no config.json — all values are defaults</span><span></span>'));
   }
+
+  // archive folder
+  const ap = $('set-archive-path');
+  const ahint = $('set-archive-hint');
+  ap.value = usage.root ?? '';
+  ahint.textContent = '';
+  let aseq = 0;
+  const acheck = async () => {
+    const mine = ++aseq;
+    const r = await api.archiveInspect(ap.value.trim()).catch((e) => ({ error: e.message }));
+    if (mine === aseq) ahint.textContent = describeFolder(r);
+  };
+  let at;
+  ap.oninput = () => { clearTimeout(at); at = setTimeout(acheck, 250); };
+  $('set-archive-open').onclick = async () => {
+    try { await api.archiveOpen(ap.value.trim()); location.reload(); }
+    catch (e) { ahint.textContent = e.message; }
+  };
+
+  const rec = $('set-recents');
+  rec.replaceChildren();
+  for (const p of arch.recents) {
+    const li = el('li');
+    li.append(el('span', 'name', esc(p)));
+    li.title = 'Open this archive';
+    li.onclick = async () => {
+      try { await api.archiveOpen(p); location.reload(); } catch (e) { banner(e.message); }
+    };
+    rec.append(li);
+  }
+
+  // language and region
+  const v = (k) => config.values[k].value;
+  $('s-language').value = v('language');
+  $('s-model').value = v('model');
+  $('s-cc').value = v('countryCode');
+  $('s-trunk').value = String(v('trunkPrefix')).replace('(none)', '');
+  $('s-nsn').value = v('nsnLength');
+  $('s-silence').value = v('silencePeakDb');
+  // Raw value, not the truncated display copy — saving the ellipsis back would
+  // silently replace a custom prompt with a broken fragment.
+  $('s-prompt').value = config.stored?.prompt ?? '';
+
+  const locked = new Set(config.lockedByEnv ?? []);
+  for (const [key, id] of Object.entries({
+    language: 's-language', model: 's-model', countryCode: 's-cc',
+    trunkPrefix: 's-trunk', nsnLength: 's-nsn', silencePeakDb: 's-silence', prompt: 's-prompt',
+  })) {
+    if (locked.has(key)) {
+      // An environment variable is winning, so a saved value would appear to do
+      // nothing. Say so instead of letting the field lie.
+      $(id).disabled = true;
+      $(id).title = 'Set by an environment variable for this run';
+    }
+  }
+
+  $('s-save').onclick = async () => {
+    const patch = {
+      language: $('s-language').value.trim() || 'ru',
+      model: $('s-model').value.trim() || 'large-v3-turbo',
+      prompt: $('s-prompt').value.trim() || null,
+      silencePeakDb: Number($('s-silence').value) || -60,
+      numbering: {
+        countryCode: $('s-cc').value.trim() || '7',
+        trunkPrefix: $('s-trunk').value.trim(),
+        nsnLength: Number($('s-nsn').value) || 10,
+      },
+    };
+    try {
+      await api.updateSettings(patch);
+      $('s-saved').textContent = 'Saved. Contact names refresh on the next rebuild.';
+      await openSettings();
+    } catch (e) { $('s-saved').textContent = e.message; }
+  };
 
   const list = $('set-actions');
   list.replaceChildren();

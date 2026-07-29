@@ -6,8 +6,9 @@ import { promisify } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
 import https from 'node:https';
-import { paths, ensureDirs } from '../core/paths.js';
-import { modelPath, DEFAULT_MODEL } from '../core/transcribe.js';
+import { appPaths } from '../core/paths.js';
+import { modelPath } from '../core/transcribe.js';
+import { MODEL as DEFAULT_MODEL } from '../core/config.js';
 
 const run = promisify(execFile);
 
@@ -24,8 +25,8 @@ let failed = false;
 
 console.log('\nSetting up voicehistory\n');
 
-ensureDirs();
-console.log(`  ✔ folders ready under ${paths.root}`);
+fs.mkdirSync(appPaths.models, { recursive: true });
+console.log(`  ✔ model folder ready: ${appPaths.models}`);
 
 await check('ffmpeg', ['-version'], 'ffmpeg');
 await check('whisper-cli', ['--help'], 'whisper.cpp');
@@ -62,7 +63,7 @@ async function fetchModel() {
   try {
     await download(MODEL_URL(DEFAULT_MODEL), tmp);
     fs.renameSync(tmp, dest);
-    console.log(`\n  ✔ model saved to ${path.relative(paths.root, dest)}`);
+    console.log(`\n  ✔ model saved to ${dest}`);
   } catch (e) {
     fs.rmSync(tmp, { force: true });
     console.log(`\n  ✖ model download failed: ${e.message}`);

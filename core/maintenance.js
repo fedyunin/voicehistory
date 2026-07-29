@@ -71,13 +71,14 @@ export function usage() {
     walk(dir);
     return { bytes, files };
   };
+  const fileSize=(f)=>{try{return {bytes:fs.statSync(f).size,files:1}}catch{return {bytes:0,files:0}}};
   return {
     root: paths.root,
-    archive: dirSize(paths.archive, AUDIO_EXT),
+    recordings: dirSize(paths.recordings, AUDIO_EXT),
     audio: dirSize(paths.audio),
     transcripts: dirSize(paths.transcripts),
-    index: dirSize(path.dirname(paths.db)),
-    names: fs.existsSync(path.join(paths.root, 'contacts.json')),
+    index: fileSize(paths.db),
+    names: fs.existsSync(paths.contacts),
   };
 }
 
@@ -111,7 +112,7 @@ export async function run(action, confirm) {
       return { action, ...(await reindex()) };
 
     case 'names': {
-      const file = path.join(paths.root, 'contacts.json');
+      const file = paths.contacts;
       const existed = fs.existsSync(file);
       fs.rmSync(file, { force: true });
       db.reloadContactNames();
@@ -130,17 +131,21 @@ export async function run(action, confirm) {
     case 'everything': {
       const before = usage();
       db.close();
-      for (const dir of [paths.archive, path.join(paths.root, 'derived'), path.dirname(paths.db)]) {
+      // The archive FOLDER and its manifest survive — only the contents go, so
+      // the user keeps the location they chose and it stays a valid archive.
+      for (const dir of [paths.recordings, paths.audio, paths.transcripts]) {
         fs.rmSync(dir, { recursive: true, force: true });
       }
-      fs.rmSync(path.join(paths.root, 'contacts.json'), { force: true });
+      for (const f of [paths.db, `${paths.db}-wal`, `${paths.db}-shm`, paths.contacts]) {
+        fs.rmSync(f, { force: true });
+      }
       ensureDirs();
       db.open();
       db.reloadContactNames();
       return {
         action,
-        deletedRecordings: before.archive.files,
-        deletedBytes: before.archive.bytes + before.audio.bytes + before.transcripts.bytes,
+        deletedRecordings: before.recordings.files,
+        deletedBytes: before.recordings.bytes + before.audio.bytes + before.transcripts.bytes,
       };
     }
     default:

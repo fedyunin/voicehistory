@@ -39,6 +39,12 @@ export const api = {
   reindex:         () => post('reindex'),
   cancel:          () => post('cancel'),
 
+  archive:         () => get('archive'),
+  archiveInspect:  (dir) => get('archive/inspect', { dir }),
+  archiveOpen:     (dir) => post('archive/open', { dir }),
+  archiveForget:   (dir) => post('archive/forget', { dir }),
+  updateSettings:  (patch) => post('settings/update', patch),
+
   maintenance:     () => get('maintenance'),
   maintenanceRun:  (action, confirm) => post('maintenance/run', { action, confirm }),
   backfillProps:   (dir) => post('backfill/props', { dir }),

@@ -1,15 +1,5 @@
-# Your archive — never commit personal recordings or transcripts.
-/archive/
-/derived/
-/db/
-/Import/*
-!/Import/.gitkeep
-
-# Your own settings; config.example.json is the committed template.
-/config.json
-
-# Your contact names are personal data.
-/contacts.json
+# The app holds no user data: archives live in a folder of the user's choosing.
+# Only machine-local things are ignored here.
 
 # Speech models are large binaries, fetched by `npm run setup`.
 /bin/models/

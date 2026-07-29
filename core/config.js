@@ -1,92 +1,99 @@
-// Single source of truth for settings.
-//
-// Before this existed, every setting was read straight from process.env in
-// whichever module needed it. That made them invisible (nothing on disk records
-// your choices) and unsafe: setting a language for `npm start` but forgetting it
-// for `node cli/vh.js transcribe` silently transcribed part of the archive with
-// the wrong one.
+// Settings in effect, resolved from the open archive.
 //
 // Precedence, highest first:
-//   1. environment variable   — one-off override for a single command
-//   2. config.json at the archive root  — your persistent settings
+//   1. environment variable        — override for a single command
+//   2. archive.json → settings     — what the interface writes; travels with the data
 //   3. built-in default
 //
-// VH_ROOT is deliberately NOT part of config.json: the file lives inside the
-// archive, so it cannot tell the program where the archive is.
-import fs from 'node:fs';
-import path from 'node:path';
+// These are exported as `let` on purpose. ES module bindings are live, so
+// reassigning them here propagates to every importer, which is what lets the
+// interface switch archives — or change the language — without restarting.
+// NUMBERING is mutated in place for the same reason.
 import { paths } from './paths.js';
+import { readManifest, DEFAULT_SETTINGS } from './archive.js';
 
-export const CONFIG_FILE = path.join(paths.root, 'config.json');
+export let LANGUAGE = DEFAULT_SETTINGS.language;
+export let MODEL = DEFAULT_SETTINGS.model;
+export let PROMPT = DEFAULT_SETTINGS.prompt;
+export let SILENCE_PEAK_DB = DEFAULT_SETTINGS.silencePeakDb;
+export const NUMBERING = { ...DEFAULT_SETTINGS.numbering };
 
-function fromFile() {
-  try {
-    const raw = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
-    return raw && typeof raw === 'object' ? raw : {};
-  } catch (e) {
-    if (e.code !== 'ENOENT') {
-      console.warn(`config.json could not be read (${e.message}); using defaults`);
-    }
-    return {};
-  }
+let stored = {};
+
+const ENV = {
+  language: 'VH_LANGUAGE',
+  model: 'VH_MODEL',
+  prompt: 'VH_PROMPT',
+  silencePeakDb: 'VH_SILENCE_PEAK_DB',
+  countryCode: 'VH_COUNTRY_CODE',
+  trunkPrefix: 'VH_TRUNK_PREFIX',
+  nsnLength: 'VH_NSN_LENGTH',
+};
+
+function env(key) {
+  const v = process.env[ENV[key]];
+  return v === undefined || v === '' ? undefined : v;
 }
 
-const file = fromFile();
+/** An empty string is meaningful for trunkPrefix ("no prefix"), so only nullish falls through. */
+function pick(key, fileValue, fallback) {
+  const e = env(key);
+  if (e !== undefined) return e;
+  return fileValue ?? fallback;
+}
 
-const pick = (envKey, fileValue, fallback) => {
-  const env = process.env[envKey];
-  if (env !== undefined && env !== '') return env;
-  // An empty string in the file is meaningful for trunkPrefix ("no prefix"),
-  // so only undefined and null fall through to the default.
-  if (fileValue !== undefined && fileValue !== null) return fileValue;
-  return fallback;
-};
+/** Re-reads the open archive's manifest. Called on open and after a settings change. */
+export function reload() {
+  const manifest = paths.root ? readManifest(paths.root) : null;
+  stored = manifest?.settings ?? {};
+  const num = stored.numbering ?? {};
 
-const numbering = file.numbering ?? {};
+  LANGUAGE = String(pick('language', stored.language, DEFAULT_SETTINGS.language));
+  MODEL = String(pick('model', stored.model, DEFAULT_SETTINGS.model));
+  PROMPT = env('prompt') ?? stored.prompt ?? DEFAULT_SETTINGS.prompt;
+  SILENCE_PEAK_DB = Number(pick('silencePeakDb', stored.silencePeakDb, DEFAULT_SETTINGS.silencePeakDb));
 
-/** Spoken language of the recordings, or 'auto' to detect per file. */
-export const LANGUAGE = String(pick('VH_LANGUAGE', file.language, 'ru'));
+  NUMBERING.countryCode =
+    String(pick('countryCode', num.countryCode, DEFAULT_SETTINGS.numbering.countryCode)).replace(/\D/g, '')
+    || DEFAULT_SETTINGS.numbering.countryCode;
+  NUMBERING.trunkPrefix =
+    String(pick('trunkPrefix', num.trunkPrefix, DEFAULT_SETTINGS.numbering.trunkPrefix)).replace(/\D/g, '');
+  NUMBERING.nsnLength = Number(pick('nsnLength', num.nsnLength, DEFAULT_SETTINGS.numbering.nsnLength));
 
-/** Whisper model name, matching bin/models/ggml-<name>.bin */
-export const MODEL = String(pick('VH_MODEL', file.model, 'large-v3-turbo'));
+  return effective();
+}
 
-/**
- * Priming prompt. `null` means "use the built-in sample for LANGUAGE" — see
- * transcribe.js, which owns the samples.
- */
-export const PROMPT = process.env.VH_PROMPT ?? file.prompt ?? null;
-
-/** Peak level below which a recording is treated as silent, in dBFS. */
-export const SILENCE_PEAK_DB = Number(pick('VH_SILENCE_PEAK_DB', file.silencePeakDb, -60));
-
-/** National numbering plan, used to read numbers written in local form. */
-export const NUMBERING = {
-  countryCode: String(pick('VH_COUNTRY_CODE', numbering.countryCode, '7')).replace(/\D/g, '') || '7',
-  trunkPrefix: String(pick('VH_TRUNK_PREFIX', numbering.trunkPrefix, '8')).replace(/\D/g, ''),
-  nsnLength: Number(pick('VH_NSN_LENGTH', numbering.nsnLength, 10)),
-};
-
-/** Everything in effect right now, and where each value came from. */
+/** Every value in effect and where it came from — the interface shows this verbatim. */
 export function effective() {
-  const source = (envKey, fileValue) => {
-    if (process.env[envKey] !== undefined && process.env[envKey] !== '') return 'environment';
-    return fileValue !== undefined && fileValue !== null ? 'config.json' : 'default';
+  const num = stored.numbering ?? {};
+  const from = (key, fileValue) => {
+    if (env(key) !== undefined) return 'environment';
+    return fileValue !== undefined && fileValue !== null ? 'archive' : 'default';
   };
   return {
-    configFile: CONFIG_FILE,
-    configFileExists: fs.existsSync(CONFIG_FILE),
     values: {
-      language: { value: LANGUAGE, from: source('VH_LANGUAGE', file.language) },
-      model: { value: MODEL, from: source('VH_MODEL', file.model) },
+      language: { value: LANGUAGE, from: from('language', stored.language) },
+      model: { value: MODEL, from: from('model', stored.model) },
       prompt: {
-        value: PROMPT ? `${PROMPT.slice(0, 42)}…` : 'built-in sample',
-        from: source('VH_PROMPT', file.prompt),
+        value: PROMPT ? `${String(PROMPT).slice(0, 46)}…` : 'built-in sample',
+        from: from('prompt', stored.prompt),
       },
-      silencePeakDb: { value: SILENCE_PEAK_DB, from: source('VH_SILENCE_PEAK_DB', file.silencePeakDb) },
-      countryCode: { value: NUMBERING.countryCode, from: source('VH_COUNTRY_CODE', numbering.countryCode) },
-      trunkPrefix: { value: NUMBERING.trunkPrefix || '(none)', from: source('VH_TRUNK_PREFIX', numbering.trunkPrefix) },
-      nsnLength: { value: NUMBERING.nsnLength, from: source('VH_NSN_LENGTH', numbering.nsnLength) },
-      archiveRoot: { value: paths.root, from: process.env.VH_ROOT ? 'environment' : 'default' },
+      silencePeakDb: { value: SILENCE_PEAK_DB, from: from('silencePeakDb', stored.silencePeakDb) },
+      countryCode: { value: NUMBERING.countryCode, from: from('countryCode', num.countryCode) },
+      trunkPrefix: { value: NUMBERING.trunkPrefix || '(none)', from: from('trunkPrefix', num.trunkPrefix) },
+      nsnLength: { value: NUMBERING.nsnLength, from: from('nsnLength', num.nsnLength) },
     },
+    // Raw stored values, for the edit form. The display copy above truncates the
+    // prompt, and writing that truncation back would quietly corrupt it.
+    stored: {
+      language: stored.language ?? null,
+      model: stored.model ?? null,
+      prompt: stored.prompt ?? null,
+      silencePeakDb: stored.silencePeakDb ?? null,
+      numbering: { ...num },
+    },
+    // Which keys the interface must not offer to edit, because an environment
+    // variable is winning and a written value would appear to do nothing.
+    lockedByEnv: Object.keys(ENV).filter((k) => env(k) !== undefined),
   };
 }

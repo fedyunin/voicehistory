@@ -8,18 +8,21 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { paths, abs, ensureDirs } from '../core/paths.js';
+import { paths, abs, ensureDirs, hasRoot } from '../core/paths.js';
 import { bus } from '../core/events.js';
 import * as db from '../core/db.js';
 import * as runner from '../core/runner.js';
 import * as lock from '../core/lock.js';
+import * as appsettings from '../core/appsettings.js';
 import { list, recording, contacts, years } from '../core/search.js';
 import { importFiles, transcribePending, scanInbox, backfillProps } from '../core/ingest.js';
 import { reindex } from '../core/reindex.js';
-import { DEFAULT_MODEL, modelAvailable } from '../core/transcribe.js';
+import { modelAvailable } from '../core/transcribe.js';
 import { vcardsToOverrides } from '../core/contactbook.js';
 import * as maintenance from '../core/maintenance.js';
-import { effective } from '../core/config.js';
+import * as config from '../core/config.js';
+import * as session from '../core/session.js';
+import * as archiveMod from '../core/archive.js';
 
 const WEB = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'app', 'renderer');
 
@@ -31,20 +34,34 @@ const MIME = {
 };
 
 export function serve(port = 4321) {
-  ensureDirs();
-  db.open();
-  // If nothing else holds the writer lock, any recording still marked 'running'
-  // is debris from a killed run and belongs back in the queue.
-  if (!lock.holder()) {
-    const { requeued } = db.recoverStale();
-    if (requeued) console.log(`  recovered ${requeued} interrupted recording(s) back into the queue`);
+  // The server starts with or without an archive: on first run the interface
+  // asks for a folder, so there is nothing to configure before launching.
+  const restored = session.restoreArchive();
+  if (restored?.missing) {
+    console.log(`  last archive is unavailable (${restored.root}) — choose another in the interface`);
+  } else if (restored) {
+    console.log(`  archive: ${restored.root}`);
+    if (!lock.holder()) {
+      const { requeued } = db.recoverStale();
+      if (requeued) console.log(`  recovered ${requeued} interrupted recording(s) back into the queue`);
+    }
+  } else {
+    console.log('  no archive yet — the interface will ask where to keep it');
   }
+
   const server = http.createServer(handle);
   server.listen(port, '127.0.0.1', () => {
-    console.log(`\n  Archive ready:  http://127.0.0.1:${port}\n  Ctrl+C to stop\n`);
+    console.log(`\n  Open:  http://127.0.0.1:${port}\n  Ctrl+C to stop\n`);
   });
   return server;
 }
+
+/** Endpoints that make no sense until a folder is chosen. */
+const NEEDS_ARCHIVE = new Set([
+  'stats', 'contacts', 'years', 'list', 'recording', 'import/scan', 'import/start',
+  'transcribe/start', 'reindex', 'contacts/rename', 'contacts/import', 'maintenance',
+  'maintenance/run', 'backfill/props', 'settings/update',
+]);
 
 async function handle(req, res) {
   const url = new URL(req.url, 'http://127.0.0.1');
@@ -64,13 +81,53 @@ async function api(req, res, url) {
   const p = url.pathname.slice(5);
   const q = url.searchParams;
 
+  if (NEEDS_ARCHIVE.has(p) && !hasRoot()) {
+    return json(res, 409, { error: 'No archive is open', needsArchive: true });
+  }
+
   switch (p) {
+    case 'archive':
+      return json(res, 200, session.archiveState());
+
+    case 'archive/inspect':
+      return json(res, 200, archiveMod.inspect(q.get('dir') ?? ''));
+
+    case 'archive/open': {
+      const { dir } = await readJson(req);
+      if (runner.isBusy()) {
+        return json(res, 409, { error: 'A job is running — stop it before switching archives' });
+      }
+      try {
+        const opened = session.openArchive(dir);
+        return json(res, 200, { ...session.archiveState(), created: opened.created });
+      } catch (e) {
+        return json(res, 400, { error: e.message });
+      }
+    }
+
+    case 'archive/forget': {
+      const { dir } = await readJson(req);
+      appsettings.forget(dir);
+      return json(res, 200, session.archiveState());
+    }
+
+    case 'settings/update': {
+      const patch = await readJson(req);
+      try {
+        archiveMod.updateSettings(patch);
+        config.reload();
+        return json(res, 200, config.effective());
+      } catch (e) {
+        return json(res, 400, { error: e.message });
+      }
+    }
+
     case 'stats':
       return json(res, 200, {
         ...db.stats(),
         job: runner.state(),
         modelReady: modelAvailable(),
-        model: DEFAULT_MODEL,
+        model: config.MODEL,
         root: paths.root,
       });
 
@@ -95,7 +152,7 @@ async function api(req, res, url) {
     // the default drop folder, and how many files are waiting in it
     case 'import/scan':
       return json(res, 200, [
-        { dir: paths.inbox, label: 'Import/', files: scanInbox(paths.inbox).length },
+        { dir: paths.inbox, label: 'inbox/', files: scanInbox(paths.inbox).length },
       ]);
 
     // count audio files in an arbitrary folder, so the UI can validate a
@@ -158,7 +215,7 @@ async function api(req, res, url) {
       const specs = Object.fromEntries(
         Object.entries(maintenance.ACTIONS).map(([k, v]) => [k, { ...v, needsConfirm: Boolean(v.confirm) }]),
       );
-      return json(res, 200, { usage: maintenance.usage(), actions: specs, config: effective() });
+      return json(res, 200, { usage: maintenance.usage(), actions: specs, config: config.effective() });
     }
 
     case 'maintenance/run': {

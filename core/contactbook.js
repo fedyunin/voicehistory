@@ -17,7 +17,7 @@ import path from 'node:path';
 import { paths } from './paths.js';
 import { normalizeContact } from './contacts.js';
 
-const FILE = () => path.join(paths.root, 'contacts.json');
+const FILE = () => paths.contacts;
 
 let cache = null;
 

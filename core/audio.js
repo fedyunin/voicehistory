@@ -9,7 +9,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
-import { SILENCE_PEAK_DB } from './config.js';
+import * as config from './config.js';
 
 const run = promisify(execFile);
 
@@ -37,12 +37,12 @@ export const PLAYBACK_FORMAT = 'm4a';
  * loudnorm helped degraded audio too, but coarsened segmentation on good audio,
  * so speechnorm is preferred.
  *
- * The original AMR in archive/ is never modified; this only affects derivatives.
+ * Originals in recordings/ are never modified; this only affects derivatives.
  */
 const SPEECH_FILTER = 'speechnorm';
 
 /** Anything peaking below this is digital silence, not quiet speech. Configurable. */
-export const SILENCE_MAX_DB = SILENCE_PEAK_DB;
+export const silenceMaxDb = () => config.SILENCE_PEAK_DB;
 
 /**
  * Peak and mean level in dBFS.
@@ -68,7 +68,7 @@ export async function measureLevelDb(file) {
 }
 
 export function isSilent({ maxDb }) {
-  return maxDb !== null && maxDb < SILENCE_MAX_DB;
+  return maxDb !== null && maxDb < config.SILENCE_PEAK_DB;
 }
 
 export async function ffmpegAvailable() {

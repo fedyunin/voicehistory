@@ -1,7 +1,7 @@
 // Schema and database access.
 //
 // IMPORTANT: the database is entirely derived. The source of truth is the files
-// on disk (audio under archive/, transcripts under derived/transcripts/). Any
+// on disk (audio under recordings/, transcripts under transcripts/). Any
 // version of the database can be deleted and rebuilt with `reindex`.
 //
 // That is a deliberate design choice: it makes schema changes trivial and means
@@ -70,7 +70,7 @@ function migrate(d) {
         id                INTEGER PRIMARY KEY,
         sha256            TEXT NOT NULL UNIQUE,  -- file identity: not name, not path
         orig_name         TEXT NOT NULL,
-        rel_path          TEXT NOT NULL,         -- archive/2026/2026-07/phone_...amr
+        rel_path          TEXT NOT NULL,         -- recordings/2026/2026-07/phone_...amr
         source            TEXT NOT NULL,         -- phone | whatsapp | viber | gmeet
         started_at        TEXT NOT NULL,         -- naive local 'YYYY-MM-DDTHH:MM:SS'
         raw_contact       TEXT,
@@ -78,8 +78,8 @@ function migrate(d) {
         direction         TEXT,                  -- Incoming | Outgoing | NULL
         duration_ms       INTEGER,
         bytes             INTEGER NOT NULL,
-        audio_path        TEXT,                  -- derived/audio/... playable copy
-        transcript_path   TEXT,                  -- derived/transcripts/....json
+        audio_path        TEXT,                  -- audio/... playable copy
+        transcript_path   TEXT,                  -- transcripts/....json
         -- pending | running | done | empty (no speech found) | silent (no signal
         -- at all, never sent to whisper) | failed
         transcript_status TEXT NOT NULL DEFAULT 'pending',

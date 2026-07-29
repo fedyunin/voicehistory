@@ -4,7 +4,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { AUDIO_EXT } from './parse.js';
 
-const SKIP_DIRS = new Set(['.props', '_duplicates', 'node_modules', '.git', 'derived', 'db', 'bin']);
+const SKIP_DIRS = new Set(['.props', '_duplicates', '.tmp', 'node_modules', '.git']);
 
 /** Recursively collect audio files. */
 export function collectAudioFiles(dir) {

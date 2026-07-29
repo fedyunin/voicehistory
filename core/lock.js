@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { paths } from './paths.js';
 
-const FILE = () => path.join(path.dirname(paths.db), '.lock');
+const FILE = () => path.join(paths.tmp, 'writer.lock');
 
 let held = false;
 
