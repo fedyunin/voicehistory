@@ -63,7 +63,10 @@ export function list({ q = '', contactId = null, year = null, source = null, off
     LIMIT @limit OFFSET @offset
   `).all({ ...args, limit, offset });
 
-  return { total, offset, limit, rows };
+  // The stems go back with the results so the interface can locate the matching
+  // phrase inside a recording without reimplementing the stemmer — one source of
+  // truth for what "matching" means.
+  return { total, offset, limit, rows, stems: q ? stems(q) : [] };
 }
 
 export function recording(id) {
@@ -100,10 +103,17 @@ function stem(word) {
   return word;
 }
 
+function terms(input) {
+  return input.trim().split(/\s+/).map((w) => w.replace(/["*^:()]/g, '')).filter(Boolean);
+}
+
+/** The stems a query reduces to, lowercased — what actually gets matched. */
+export function stems(input) {
+  return terms(input).map((w) => stem(w).toLowerCase());
+}
+
 function ftsQuery(input) {
-  const words = input.trim().split(/\s+/)
-    .map((w) => w.replace(/["*^:()]/g, ''))
-    .filter(Boolean);
+  const words = terms(input);
   if (!words.length) return '""';
   return words.map((w) => `"${stem(w)}"*`).join(' AND ');
 }

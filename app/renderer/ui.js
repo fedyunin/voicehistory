@@ -10,7 +10,8 @@ const el = (tag, cls, html) => {
   return n;
 };
 
-const state = { q: '', contactId: null, year: null, offset: 0, total: 0, currentId: null, segments: [] };
+const state = { q: '', stems: [], contactId: null, year: null, offset: 0, total: 0,
+                currentId: null, segments: [], hits: [], hitAt: 0 };
 
 /* ======================= boot ======================= */
 
@@ -108,6 +109,7 @@ async function loadList(reset) {
     q: state.q, contact: state.contactId, year: state.year, offset: state.offset, limit: 60,
   });
   state.total = r.total;
+  state.stems = r.stems ?? [];
 
   const ul = $('calls');
   if (reset) ul.replaceChildren();
@@ -188,15 +190,50 @@ async function openRecording(id) {
   d.append(player);
 
   if (rec.segments.length) {
+    // Which phrases the current search matched. Computed from the stems the
+    // search itself returned, so "matching" means the same thing in both places.
+    state.hits = state.stems.length
+      ? rec.segments.map((s, i) => (matchesStems(s.text) ? i : -1)).filter((i) => i >= 0)
+      : [];
+    state.hitAt = 0;
+
     const ul = el('ul', 'segments');
     rec.segments.forEach((s, i) => {
-      const li = el('li');
+      const li = el('li', state.hits.includes(i) ? 'hit' : '');
       li.dataset.i = i;
-      li.append(el('span', 't', fmtTime(s.t0)), el('span', '', esc(s.text)));
+      li.append(el('span', 't', fmtTime(s.t0)), el('span', '', markStems(s.text)));
       li.onclick = () => { audio.currentTime = s.t0 / 1000; audio.play(); };
       ul.append(li);
     });
     d.append(ul);
+
+    // Landing at the top of a 27-minute call after searching for one phrase
+    // means finding it twice. Go to it, in the text and in the audio.
+    if (state.hits.length) {
+      const jump = (n) => {
+        state.hitAt = (n + state.hits.length) % state.hits.length;
+        const i = state.hits[state.hitAt];
+        const li = ul.children[i];
+        li.scrollIntoView({ block: 'center' });
+        audio.currentTime = rec.segments[i].t0 / 1000;
+        for (const x of ul.children) x.classList.toggle('hit-now', x === li);
+        counter.textContent = state.hits.length > 1
+          ? `match ${state.hitAt + 1} of ${state.hits.length}`
+          : '1 match';
+      };
+      const nav = el('div', 'hit-nav');
+      const counter = el('span', 'muted tiny');
+      const prev = el('button', 'small', '↑');
+      const next = el('button', 'small', '↓');
+      prev.title = 'Previous match';
+      next.title = 'Next match';
+      prev.onclick = () => jump(state.hitAt - 1);
+      next.onclick = () => jump(state.hitAt + 1);
+      nav.append(counter);
+      if (state.hits.length > 1) nav.append(prev, next);
+      player.append(nav);
+      jump(0);
+    }
 
     // Highlight the line currently being spoken — the reason timestamps matter.
     audio.ontimeupdate = () => {
@@ -214,6 +251,33 @@ async function openRecording(id) {
   d.append(el('div', 'filelink', esc(rec.rel_path)));
   d.scrollTop = 0;
 }
+
+/* ======================= search matching ======================= */
+
+/**
+ * A phrase matches when it contains every stem of the query — the same AND
+ * semantics the database search uses, so a highlighted line is one the search
+ * would have found on its own.
+ */
+function matchesStems(text) {
+  const lower = text.toLowerCase();
+  return state.stems.every((s) => lower.includes(s));
+}
+
+/** Escapes first, then marks the stems, so no input can inject markup. */
+function markStems(text) {
+  let html = esc(text);
+  for (const s of state.stems) {
+    if (!s) continue;
+    // Extend the mark to the end of the word, so a stem does not visually cut
+    // a word in half.
+    const re = new RegExp(`(${escapeRe(esc(s))}[\\p{L}\\p{N}]*)`, 'giu');
+    html = html.replace(re, '<mark>$1</mark>');
+  }
+  return html;
+}
+
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\/* ======================= events ======================= */');
 
 /* ======================= events ======================= */
 
