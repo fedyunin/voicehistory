@@ -1,6 +1,6 @@
 // The interface. Knows only about api.js — nothing about HTTP or SQLite.
 // Porting to Electron does not require opening this file.
-import { api, isDesktop } from '/api.js';
+import { api, isDesktop } from './api.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, html) => {
@@ -17,6 +17,8 @@ const state = { q: '', contactId: null, year: null, offset: 0, total: 0, current
 boot();
 
 async function boot() {
+  // The traffic-light inset is macOS-only; other platforms keep a normal bar.
+  if (globalThis.vh?.platform === 'darwin') document.body.classList.add('mac');
   api.subscribe(onProgress, onJob);
 
   // Nothing can be listed until a folder is chosen, so that comes first.

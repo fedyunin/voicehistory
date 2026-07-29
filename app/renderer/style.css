@@ -53,7 +53,15 @@ code { font-family: var(--mono); font-size: 0.9em; }
   border-bottom: 1px solid var(--line);
   background: var(--panel);
   flex: none;
+  /* The desktop window has no system title bar, so the header doubles as one:
+     draggable everywhere except on the controls themselves. */
+  -webkit-app-region: drag;
 }
+.top button, .top input, .top .searchbox { -webkit-app-region: no-drag; }
+
+/* Leave room for the traffic lights, which macOS draws over the content. */
+body.mac .top { padding-left: 84px; }
+body.mac .firstrun-card { padding-top: 8px; }
 .brand { display: flex; align-items: center; gap: 8px; font-weight: 600; white-space: nowrap; }
 .brand .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
 
