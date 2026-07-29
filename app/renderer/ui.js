@@ -232,7 +232,12 @@ async function openRecording(id) {
       nav.append(counter);
       if (state.hits.length > 1) nav.append(prev, next);
       player.append(nav);
-      jump(0);
+
+      // Wait for layout before scrolling. Called synchronously after the list is
+      // appended, scrollIntoView does nothing at all — the element has no
+      // computed position yet — which left the pane at the top while the audio
+      // had already seeked, so a working jump looked like a broken one.
+      requestAnimationFrame(() => requestAnimationFrame(() => jump(0)));
     }
 
     // Highlight the line currently being spoken — the reason timestamps matter.
