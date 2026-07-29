@@ -205,6 +205,19 @@ async function openRecording(id) {
 
 /* ======================= events ======================= */
 
+/**
+ * Wraps a click handler so a thrown error becomes a visible message.
+ *
+ * Without this, any exception inside an opener vanished into an unhandled
+ * rejection and the button simply appeared dead — which is exactly how a stale
+ * field name in one dialog presented itself.
+ */
+function guard(fn) {
+  return async (...args) => {
+    try { await fn(...args); } catch (e) { banner(e.message || String(e)); }
+  };
+}
+
 function wire() {
   let t;
   $('q').oninput = (e) => {
@@ -215,16 +228,16 @@ function wire() {
   $('clear').onclick = () => { $('q').value = ''; state.q = ''; loadList(true); };
   $('more').onclick = () => { state.offset += 60; loadList(false); };
 
-  $('btn-import').onclick = openImport;
+  $('btn-import').onclick = guard(openImport);
   $('imp-cancel').onclick = () => $('dlg-import').close();
-  $('imp-go').onclick = startImport;
+  $('imp-go').onclick = guard(startImport);
   $('imp-src').onchange = onSourceChange;
   let ct;
   $('imp-custom').oninput = () => { clearTimeout(ct); ct = setTimeout(checkCustom, 250); };
 
-  $('btn-jobs').onclick = async () => { await refreshStats(); $('dlg-jobs').showModal(); };
+  $('btn-jobs').onclick = guard(async () => { await refreshStats(); $('dlg-jobs').showModal(); });
   $('jobs-cancel').onclick = () => $('dlg-jobs').close();
-  $('jobs-go').onclick = startTranscribe;
+  $('jobs-go').onclick = guard(startTranscribe);
   $('jobs-reindex').onclick = async () => {
     $('dlg-jobs').close();
     try { await api.reindex(); } catch (e) { banner(e.message); }
@@ -232,12 +245,12 @@ function wire() {
 
   $('prog-cancel').onclick = () => api.cancel();
 
-  $('btn-settings').onclick = openSettings;
+  $('btn-settings').onclick = guard(openSettings);
   $('set-close').onclick = () => { $('dlg-settings').close(); refreshAll(); };
 
-  $('btn-people').onclick = openPeople;
+  $('btn-people').onclick = guard(openPeople);
   $('people-close').onclick = () => { $('dlg-people').close(); refreshAll(); };
-  $('vcf').onchange = importVCard;
+  $('vcf').onchange = guard(importVCard);
 }
 
 /* ======================= first run ======================= */
@@ -331,7 +344,7 @@ async function openSettings() {
     u.append(row);
   };
   line('Archive root', usage.root);
-  line('Audio (originals)', `${usage.archive.files} files · ${fmtBytes(usage.archive.bytes)}`);
+  line('Recordings', `${usage.recordings.files} files · ${fmtBytes(usage.recordings.bytes)}`);
   line('Playable copies', `${usage.audio.files} files · ${fmtBytes(usage.audio.bytes)}`);
   line('Transcripts', `${usage.transcripts.files} files · ${fmtBytes(usage.transcripts.bytes)}`);
   line('Search index', fmtBytes(usage.index.bytes));
