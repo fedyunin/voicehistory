@@ -108,6 +108,27 @@ export function filterSegments(rawSegments) {
   return { segments: out, filtered: rawSegments.length - out.length };
 }
 
+/**
+ * Detects the decode collapse: text arrives as an unbroken lowercase run with no
+ * sentence punctuation. It is a distinct failure, not merely poor recognition —
+ * the same audio normalized produces properly cased, punctuated speech.
+ *
+ * Level does not predict it. The quietest sample measured here (mean −24 dBFS)
+ * decodes fine, while a louder file collapses, so the only reliable signal is
+ * the output itself.
+ *
+ * Thresholds sit far from both observed cases: healthy output runs about 0.16
+ * capitals and 0.46 punctuation marks per word, a collapsed one exactly zero.
+ */
+export function looksCollapsed(segments) {
+  const text = segments.map((s) => s.text).join(' ').trim();
+  const words = text.split(/\s+/).filter(Boolean).length;
+  if (words < 20) return false;                    // too little to judge
+  const caps = (text.match(/\p{Lu}/gu) ?? []).length;
+  const punct = (text.match(/[.,!?;:]/g) ?? []).length;
+  return caps / words < 0.03 && punct / words < 0.08;
+}
+
 /** Prefer a binary shipped next to the app, fall back to PATH. */
 export function resolveBinary() {
   const bundled = path.join(appPaths.bin, process.platform === 'win32' ? 'whisper-cli.exe' : 'whisper-cli');
@@ -147,11 +168,12 @@ export async function transcribeWav(wavPath, {
     '-oj',
     '-of', outBase,
     '-np',
-    // Beam 2 instead of the default 5: measured 7.6x realtime versus 5.0x on
-    // the same file with no visible difference in the text. The q5_0 quantized
-    // model is faster than fp16 but noticeably worse at recognizing words —
-    // rejected.
-    '-bs', '2',
+    // Beam 5. An earlier measurement on one clean file showed no difference
+    // against beam 2 and it was lowered for speed; re-measured on degraded phone
+    // audio, beam 5 recovers a little more text and more punctuation for about
+    // 9% more time. The q5_0 quantized model is faster than fp16 but noticeably
+    // worse at recognizing words — rejected.
+    '-bs', '5',
   ];
   // IMPORTANT: never add --no-fallback. Measured: without temperature fallback
   // the model degenerates into loops ("Sound sound sound sound…") on phone-line

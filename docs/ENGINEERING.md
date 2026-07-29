@@ -16,13 +16,14 @@ and CPU anywhere. Only the binary path differs, which is what keeps
 | Setting | Finding |
 |---|---|
 | Priming prompt | **Required.** See below |
-| `speechnorm` preprocessing | **Clear win.** See below |
-| `-bs 2` instead of beam 5 | 7.6× realtime versus 5.0× on the same file, no visible difference in the text |
+| `speechnorm` preprocessing | **Only when needed.** See below |
+| Beam 5, not 2 | An earlier one-file measurement showed no difference and it was lowered for speed; on degraded audio beam 5 recovers a little more text for ~9% more time |
 | `--no-fallback` | **Never.** Roughly twice as fast, but on line noise the model degenerates into loops — one file produced the same single word forty times over. Temperature fallback is load-bearing |
 | Plain gain (`volume=10dB`) | No meaningful effect. Whisper normalizes level internally |
 | `loudnorm` | Helps degraded audio as much as `speechnorm`, but coarsens segmentation on good audio |
 | `dynaudnorm` | No measurable effect on these recordings |
 | q5_0 quantized model | Faster than fp16, noticeably worse at recognizing words |
+| `large-v3` instead of turbo | **Not worth it.** 2.7× realtime against 8.2×, and no better text — see below |
 | VAD | Suppresses hallucinations well, but degrades text and yields timestamps too coarse to seek by (~30 s) |
 
 ### The priming prompt
@@ -60,6 +61,43 @@ actual win.
 
 Normalization is applied to the playable copies too, since the quiet party is
 often barely audible in the raw file. Originals in `recordings/` are never modified.
+
+### …but only when the decode collapses
+
+The finding above was drawn from one badly degraded file and wrongly generalized
+to everything. Measured across more material, normalizing healthy audio **costs**
+segmentation: on a three-minute excerpt it turned 45 recognized phrases into 27
+and lost punctuation, because compressing dynamic range flattens the pauses the
+model splits on. Coarser phrases also mean coarser seeking.
+
+Level does not predict which files need it. The quietest sample measured, mean
+−24 dBFS, decodes fine untouched, while a louder one collapses.
+
+What does predict it is the output: a collapse arrives as an unbroken lowercase
+run with no sentence punctuation, quantifiably distinct from healthy output —
+zero capitals and zero punctuation per word against roughly 0.16 and 0.46.
+
+So recognition runs on the audio as recorded, and only retries normalized when the
+result looks collapsed. Just the affected minority pays for a second pass.
+
+Re-transcribing three real calls this way: **punctuation up 17% overall and 30% on
+the longest call**, words up slightly, segmentation coarser on one file of three.
+A modest net win, mostly in readability.
+
+### Why not a bigger model
+
+`large-v3` has 32 decoder layers against turbo's 4, so it should win on hard
+audio. It does not win here, and it costs three times the time: 2.7× realtime
+against 8.2×.
+
+On the same three-minute excerpt the two models produced three mutually
+incompatible readings of the opening phrase, which is the tell — that audio is
+genuinely unintelligible and every model is guessing. Elsewhere they largely
+agree, and where they differ the score is even: large-v3 got a case ending right
+that turbo missed, turbo got a verb right that large-v3 mangled.
+
+The model is not the bottleneck. AMR-NB at 8 kHz and 12.2 kbit/s keeps 300–3400 Hz
+and discards the rest, and no decoder recovers information the codec threw away.
 
 ---
 

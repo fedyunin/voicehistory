@@ -17,7 +17,7 @@ import { collectAudioFiles, sha256File, transferFile, freePath } from './scan.js
 import {
   toPlayable, toWhisperWav, probeDurationMs, measureLevelDb, isSilent, PLAYBACK_FORMAT,
 } from './audio.js';
-import { transcribeWav, filterSegments } from './transcribe.js';
+import { transcribeWav, filterSegments, looksCollapsed } from './transcribe.js';
 import { progress, logLine } from './events.js';
 import * as lock from './lock.js';
 
@@ -299,8 +299,21 @@ async function runTranscribe({
         continue;
       }
 
-      await toWhisperWav(src, wav);
-      const out = await transcribeWav(wav, { model });
+      // Recognize the audio as recorded. Normalization used to be applied to
+      // everything, on the strength of one badly degraded file it rescued —
+      // measured more widely it costs segmentation on healthy audio, turning 45
+      // phrases into 27 and coarsening every seek.
+      await toWhisperWav(src, wav, { normalize: false });
+      let out = await transcribeWav(wav, { model });
+
+      // …but when the decode collapses, normalization is what fixes it. Only the
+      // affected minority pays for a second pass.
+      if (looksCollapsed(out.segments)) {
+        logLine(`${rec.orig_name}: decode looks collapsed, retrying normalized`);
+        await toWhisperWav(src, wav, { normalize: true });
+        const retry = await transcribeWav(wav, { model });
+        if (!looksCollapsed(retry.segments)) out = retry;
+      }
 
       const tPath = transcriptPathFor(rec);
       fs.mkdirSync(path.dirname(tPath), { recursive: true });
