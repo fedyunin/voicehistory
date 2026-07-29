@@ -176,11 +176,16 @@ async function openRecording(id) {
   if (rec.source !== 'phone') bits.push(rec.source);
   d.append(el('div', 'sub', bits.join(' · ')));
 
+  // The player is wrapped so it can stick to the top of the pane: on a long
+  // transcript it would otherwise scroll out of reach, leaving no way to pause or
+  // scrub while reading.
+  const player = el('div', 'player');
   const audio = el('audio');
   audio.controls = true;
   audio.preload = 'none';
   audio.src = api.mediaUrl(id);
-  d.append(audio);
+  player.append(audio);
+  d.append(player);
 
   if (rec.segments.length) {
     const ul = el('ul', 'segments');
