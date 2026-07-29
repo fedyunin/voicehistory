@@ -23,6 +23,7 @@ import * as maintenance from '../core/maintenance.js';
 import * as config from '../core/config.js';
 import * as session from '../core/session.js';
 import * as archiveMod from '../core/archive.js';
+import { all as choices, matchPlan } from '../core/choices.js';
 
 const WEB = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'app', 'renderer');
 
@@ -152,7 +153,7 @@ async function api(req, res, url) {
     // the default drop folder, and how many files are waiting in it
     case 'import/scan':
       return json(res, 200, [
-        { dir: paths.inbox, label: 'inbox/', files: scanInbox(paths.inbox).length },
+        { dir: paths.inbox, label: "The archive's own inbox folder", files: scanInbox(paths.inbox).length },
       ]);
 
     // count audio files in an arbitrary folder, so the UI can validate a
@@ -211,6 +212,9 @@ async function api(req, res, url) {
     }
 
     // what each destructive action would cost, plus current disk usage
+    case 'choices':
+      return json(res, 200, { ...choices(), currentPlan: matchPlan(config.NUMBERING) });
+
     case 'maintenance': {
       const specs = Object.fromEntries(
         Object.entries(maintenance.ACTIONS).map(([k, v]) => [k, { ...v, needsConfirm: Boolean(v.confirm) }]),

@@ -21,7 +21,7 @@ const RENDERER = path.join(HERE, 'renderer');
 let paths, abs, hasRoot, bus, db, runner, lock, appsettings, session, archive, config,
     maintenance, list, recording, contacts, years,
     importFiles, transcribePending, scanInbox, backfillProps, reindex, modelAvailable,
-    vcardsToOverrides;
+    vcardsToOverrides, choices, matchPlan;
 
 async function loadCore() {
   const m = async (p) => import(pathToFileURL(path.join(HERE, '..', 'core', p)).href);
@@ -40,6 +40,7 @@ async function loadCore() {
   ({ reindex } = await m('reindex.js'));
   ({ modelAvailable } = await m('transcribe.js'));
   ({ vcardsToOverrides } = await m('contactbook.js'));
+  ({ all: choices, matchPlan } = await m('choices.js'));
 }
 
 let win = null;
@@ -99,7 +100,7 @@ const API = {
   recording: ({ id }) => recording(Number(id)) ?? { error: 'no such recording' },
 
   /* --- import --- */
-  'import/scan': () => [{ dir: paths.inbox, label: 'inbox/', files: scanInbox(paths.inbox).length }],
+  'import/scan': () => [{ dir: paths.inbox, label: "The archive's own inbox folder", files: scanInbox(paths.inbox).length }],
   'import/check': ({ dir }) => {
     if (!dir) throw new Error('no folder given');
     const resolved = path.resolve(archive.expandHome(dir));
@@ -135,6 +136,8 @@ const API = {
   },
 
   /* --- maintenance --- */
+  choices: () => ({ ...choices(), currentPlan: matchPlan(config.NUMBERING) }),
+
   maintenance: () => ({
     usage: maintenance.usage(),
     actions: Object.fromEntries(Object.entries(maintenance.ACTIONS)

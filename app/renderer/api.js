@@ -82,6 +82,7 @@ export const api = {
   cancel:          () => call('cancel'),
   renameContact:   (key, name) => call('contacts/rename', { key, name }),
   importVCard:     (vcard) => call('contacts/import', { vcard }),
+  choices:         () => call('choices'),
   maintenance:     () => call('maintenance'),
   maintenanceRun:  (action, confirm) => call('maintenance/run', { action, confirm }),
   backfillProps:   (dir) => call('backfill/props', { dir }),

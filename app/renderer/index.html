@@ -109,7 +109,10 @@
 
   <label class="field" id="imp-custom-field" hidden>
     <span>Folder path</span>
-    <input id="imp-custom" type="text" placeholder="/Users/you/Documents/CubeCallRecorder/All" spellcheck="false">
+    <div class="vcf-row">
+      <input id="imp-custom" type="text" class="grow" placeholder="/Users/you/Documents/CubeCallRecorder/All" spellcheck="false">
+      <button id="imp-browse" hidden>Browse…</button>
+    </div>
     <span id="imp-custom-hint" class="hint muted tiny"></span>
   </label>
 
@@ -194,20 +197,27 @@
   <p class="muted tiny">Applied immediately. Changing the language does not re-transcribe what is already done — use “Delete transcripts” for that.</p>
   <div class="settings-grid">
     <label><span>Spoken language</span>
-      <input id="s-language" type="text" spellcheck="false" placeholder="ru"></label>
-    <label><span>Model</span>
-      <input id="s-model" type="text" spellcheck="false" placeholder="large-v3-turbo"></label>
-    <label><span>Country code</span>
-      <input id="s-cc" type="text" inputmode="numeric" placeholder="7"></label>
-    <label><span>Trunk prefix</span>
-      <input id="s-trunk" type="text" inputmode="numeric" placeholder="8"></label>
-    <label><span>Subscriber digits</span>
-      <input id="s-nsn" type="number" min="4" max="15" placeholder="10"></label>
-    <label><span>Silence peak, dBFS</span>
-      <input id="s-silence" type="number" min="-120" max="0" placeholder="-60"></label>
+      <select id="s-language"></select></label>
+    <label><span>Recognition model</span>
+      <select id="s-model"></select></label>
+    <label class="wide-field"><span>Phone numbering — sets dialling code, trunk prefix and number length together</span>
+      <select id="s-plan"></select></label>
+    <label><span>Skip recordings quieter than</span>
+      <select id="s-silence"></select></label>
+    <label><span></span>
+      <span id="s-plan-summary" class="plan-summary muted tiny"></span></label>
     <label class="wide-field"><span>Priming prompt — must be in the language above</span>
       <input id="s-prompt" type="text" spellcheck="false" placeholder="leave empty for the built-in sample"></label>
   </div>
+
+  <fieldset class="settings-grid" id="s-custom-plan" hidden>
+    <label><span>Dialling code</span>
+      <input id="s-cc" type="text" inputmode="numeric" placeholder="7"></label>
+    <label><span>Trunk prefix (empty if none)</span>
+      <input id="s-trunk" type="text" inputmode="numeric" placeholder="8"></label>
+    <label><span>Subscriber digits</span>
+      <input id="s-nsn" type="number" min="4" max="15" placeholder="10"></label>
+  </fieldset>
   <div class="vcf-row">
     <button id="s-save" class="primary">Save settings</button>
     <span id="s-saved" class="muted tiny"></span>

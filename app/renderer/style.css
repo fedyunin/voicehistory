@@ -276,3 +276,10 @@ dialog.wide-dlg { max-width: 660px; }
 }
 .list-plain.recents li { font-family: var(--mono); font-size: 12px; margin-top: 2px; }
 @media (max-width: 640px) { .settings-grid { grid-template-columns: 1fr; } }
+
+.settings-grid select {
+  width: 100%; padding: 6px 9px; border: 1px solid var(--line); border-radius: 7px;
+  background: var(--bg); color: var(--ink); font: inherit; font-size: 13.5px;
+}
+.settings-grid select:disabled { opacity: .5; }
+.plan-summary { display: block; padding-top: 7px; font-family: var(--mono); }

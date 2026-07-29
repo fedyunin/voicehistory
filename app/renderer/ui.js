@@ -234,6 +234,13 @@ function wire() {
   $('imp-src').onchange = onSourceChange;
   let ct;
   $('imp-custom').oninput = () => { clearTimeout(ct); ct = setTimeout(checkCustom, 250); };
+  if (isDesktop) {
+    $('imp-browse').hidden = false;
+    $('imp-browse').onclick = guard(async () => {
+      const r = await api.chooseFolder('open');
+      if (!r.canceled) { $('imp-custom').value = r.dir; checkCustom(); }
+    });
+  }
 
   $('btn-jobs').onclick = guard(async () => { await refreshStats(); $('dlg-jobs').showModal(); });
   $('jobs-cancel').onclick = () => $('dlg-jobs').close();
@@ -403,14 +410,44 @@ async function openSettings() {
     rec.append(li);
   }
 
-  // language and region
+  // language and region — every value picked from a list, since none of these
+  // are guessable: a language code, a model name, or three interlocking numbers
+  // that describe a numbering plan.
   const v = (k) => config.values[k].value;
-  $('s-language').value = v('language');
-  $('s-model').value = v('model');
+  const ch = await api.choices();
+
+  fill('s-language', ch.languages.map((l) => [l.code, `${l.name} (${l.code})`]), v('language'));
+  fill('s-model', ch.models.map((m) => [m.id, `${m.name} · ${m.size}`]), v('model'));
+  fill('s-silence', ch.silenceLevels.map((s) => [String(s.value), s.name]), String(v('silencePeakDb')));
+  fill('s-plan',
+    [...ch.numberingPlans.map((p) => [p.id, p.name]), ['custom', 'Custom…']],
+    ch.currentPlan ?? 'custom');
+
+  const plans = new Map(ch.numberingPlans.map((p) => [p.id, p]));
+  const syncPlan = () => {
+    const id = $('s-plan').value;
+    const custom = id === 'custom';
+    $('s-custom-plan').hidden = !custom;
+    const p = custom
+      ? { countryCode: $('s-cc').value.trim(), trunkPrefix: $('s-trunk').value.trim(), nsnLength: $('s-nsn').value }
+      : plans.get(id);
+    // Spell out what the choice means, so the effect is visible before saving.
+    $('s-plan-summary').textContent = p
+      ? `+${p.countryCode} · trunk ${p.trunkPrefix || 'none'} · ${p.nsnLength} digits`
+      : '';
+    if (!custom && p) {
+      $('s-cc').value = p.countryCode;
+      $('s-trunk').value = p.trunkPrefix;
+      $('s-nsn').value = p.nsnLength;
+    }
+  };
+  $('s-plan').onchange = syncPlan;
+  for (const id of ['s-cc', 's-trunk', 's-nsn']) $(id).oninput = syncPlan;
   $('s-cc').value = v('countryCode');
   $('s-trunk').value = String(v('trunkPrefix')).replace('(none)', '');
   $('s-nsn').value = v('nsnLength');
-  $('s-silence').value = v('silencePeakDb');
+  syncPlan();
+
   // Raw value, not the truncated display copy — saving the ellipsis back would
   // silently replace a custom prompt with a broken fragment.
   $('s-prompt').value = config.stored?.prompt ?? '';
@@ -420,6 +457,7 @@ async function openSettings() {
     language: 's-language', model: 's-model', countryCode: 's-cc',
     trunkPrefix: 's-trunk', nsnLength: 's-nsn', silencePeakDb: 's-silence', prompt: 's-prompt',
   })) {
+    if (locked.has(key) && ['countryCode', 'trunkPrefix', 'nsnLength'].includes(key)) $('s-plan').disabled = true;
     if (locked.has(key)) {
       // An environment variable is winning, so a saved value would appear to do
       // nothing. Say so instead of letting the field lie.
@@ -430,10 +468,10 @@ async function openSettings() {
 
   $('s-save').onclick = async () => {
     const patch = {
-      language: $('s-language').value.trim() || 'ru',
-      model: $('s-model').value.trim() || 'large-v3-turbo',
+      language: $('s-language').value,
+      model: $('s-model').value,
       prompt: $('s-prompt').value.trim() || null,
-      silencePeakDb: Number($('s-silence').value) || -60,
+      silencePeakDb: Number($('s-silence').value),
       numbering: {
         countryCode: $('s-cc').value.trim() || '7',
         trunkPrefix: $('s-trunk').value.trim(),
@@ -484,6 +522,25 @@ async function openSettings() {
   }
 
   $('dlg-settings').showModal();
+}
+
+/** Fills a select from [value, label] pairs and selects one. */
+function fill(id, pairs, selected) {
+  const s = $(id);
+  s.replaceChildren();
+  for (const [value, label] of pairs) {
+    const o = el('option', '', esc(label));
+    o.value = value;
+    s.append(o);
+  }
+  // An unknown stored value must stay visible rather than silently becoming
+  // whatever happens to be first in the list.
+  if (selected !== undefined && selected !== null && !pairs.some(([v]) => v === selected)) {
+    const o = el('option', '', `${esc(String(selected))} (not in list)`);
+    o.value = selected;
+    s.append(o);
+  }
+  s.value = selected;
 }
 
 function fmtBytes(n) {
@@ -559,11 +616,11 @@ async function openImport() {
   const sel = $('imp-src');
   sel.replaceChildren();
   for (const s of sources) {
-    const o = el('option', '', `${esc(s.label)} — ${s.files} files`);
+    const o = el('option', '', `${esc(s.label)} — ${s.files ? s.files + ' files waiting' : 'empty'}`);
     o.value = s.dir;
     sel.append(o);
   }
-  sel.append(Object.assign(el('option', '', 'Another folder…'), { value: CUSTOM }));
+  sel.append(Object.assign(el('option', '', 'Choose another folder…'), { value: CUSTOM }));
 
   // If Import/ is empty, jump straight to the custom-path field: the archive
   // usually lives outside the project.
