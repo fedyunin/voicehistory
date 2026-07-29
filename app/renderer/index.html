@@ -39,7 +39,10 @@
 
     <label class="field">
       <span>Folder</span>
-      <input id="fr-path" type="text" spellcheck="false" placeholder="/Users/you/Documents/Voice History">
+      <div class="vcf-row">
+        <input id="fr-path" type="text" spellcheck="false" class="grow" placeholder="/Users/you/Documents/Voice History">
+        <button id="fr-browse" hidden>Browse…</button>
+      </div>
       <span id="fr-hint" class="hint muted tiny"></span>
     </label>
 
@@ -181,6 +184,7 @@
   <p class="muted tiny">Stored in <code>archive.json</code> inside the folder, so settings travel with the data.</p>
   <div class="vcf-row">
     <input id="set-archive-path" type="text" spellcheck="false" class="grow">
+    <button id="set-archive-browse" hidden>Browse…</button>
     <button id="set-archive-open">Open</button>
   </div>
   <span id="set-archive-hint" class="hint muted tiny"></span>

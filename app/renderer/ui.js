@@ -1,6 +1,6 @@
 // The interface. Knows only about api.js — nothing about HTTP or SQLite.
 // Porting to Electron does not require opening this file.
-import { api } from '/api.js';
+import { api, isDesktop } from '/api.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, html) => {
@@ -270,6 +270,16 @@ function firstRun(arch) {
   let t;
   input.oninput = () => { clearTimeout(t); t = setTimeout(check, 250); };
   input.onkeydown = (e) => { if (e.key === 'Enter' && !go.disabled) go.click(); };
+
+  // A native picker exists only in the desktop shell; the browser has no way to
+  // turn a chosen folder into a path, so there the field is the only option.
+  if (isDesktop) {
+    $('fr-browse').hidden = false;
+    $('fr-browse').onclick = async () => {
+      const r = await api.chooseFolder('create');
+      if (!r.canceled) { input.value = r.dir; check(); }
+    };
+  }
   go.onclick = async () => {
     go.disabled = true;
     try {
@@ -354,6 +364,13 @@ async function openSettings() {
   };
   let at;
   ap.oninput = () => { clearTimeout(at); at = setTimeout(acheck, 250); };
+  if (isDesktop) {
+    $('set-archive-browse').hidden = false;
+    $('set-archive-browse').onclick = async () => {
+      const r = await api.chooseFolder('open');
+      if (!r.canceled) { ap.value = r.dir; acheck(); }
+    };
+  }
   $('set-archive-open').onclick = async () => {
     try { await api.archiveOpen(ap.value.trim()); location.reload(); }
     catch (e) { ahint.textContent = e.message; }

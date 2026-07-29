@@ -12,7 +12,8 @@
     "reindex": "node cli/vh.js reindex",
     "doctor": "node cli/vh.js doctor",
     "jobs": "node cli/vh.js jobs",
-    "watch": "node cli/vh.js watch"
+    "watch": "node cli/vh.js watch",
+    "app": "node scripts/app.mjs"
   },
   "keywords": [
     "whisper",
@@ -43,5 +44,9 @@
   "bugs": {
     "url": "https://github.com/fedyunin/voicehistory/issues"
   },
-  "homepage": "https://github.com/fedyunin/voicehistory#readme"
+  "homepage": "https://github.com/fedyunin/voicehistory#readme",
+  "devDependencies": {
+    "electron": "^43.2.0"
+  },
+  "main": "app/main.cjs"
 }
