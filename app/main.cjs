@@ -9,13 +9,33 @@
 // the real electron bindings — the module resolves to an empty object — whereas
 // require() in a .cjs entry is the long-standing, reliable route. core/ stays ESM
 // and is pulled in with dynamic import inside the bootstrap below.
-const { app, BrowserWindow, ipcMain, dialog, protocol, shell, net } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, protocol, shell } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
+const { Readable } = require('node:stream');
+
+const MEDIA_TYPES = {
+  '.m4a': 'audio/mp4', '.mp3': 'audio/mpeg', '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg', '.opus': 'audio/ogg', '.amr': 'audio/amr',
+};
 
 const HERE = __dirname;
 const RENDERER = path.join(HERE, 'renderer');
+
+/**
+ * Declare the media scheme before the app is ready — after that it is too late,
+ * and a custom scheme without these privileges cannot feed a <audio> element:
+ * playback fails with "no supported source was found" and media error code 4.
+ *
+ * `stream` is the one that matters here. Without it Chromium will not treat the
+ * response as seekable media, so the transcript-to-audio sync the whole interface
+ * is built around silently does nothing.
+ */
+protocol.registerSchemesAsPrivileged([{
+  scheme: 'vh',
+  privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, bypassCSP: true },
+}]);
 
 // Filled by loadCore() before any window exists.
 let paths, abs, hasRoot, bus, db, runner, lock, appsettings, session, archive, config,
@@ -185,12 +205,40 @@ function registerMediaProtocol() {
     const file = abs(row.audio_path ?? row.rel_path);
     if (!fs.existsSync(file)) return new Response('file missing', { status: 404 });
 
-    // net.fetch on a file:// URL gives Chromium's own file handler, which already
-    // implements Range and content types correctly — less to get wrong than
-    // streaming it by hand.
-    return net.fetch(pathToFileURL(file).toString(), {
-      headers: request.headers,
-      bypassCustomProtocolHandlers: true,
+    // Range is implemented here rather than delegated to net.fetch on a file://
+    // URL. That delegation plays audio but reports seekable.end === 0, because
+    // the response carries no Accept-Ranges or Content-Length, so Chromium treats
+    // it as an unseekable stream — and clicking a transcript line to jump to that
+    // moment silently does nothing.
+    const size = fs.statSync(file).size;
+    const type = MEDIA_TYPES[path.extname(file).toLowerCase()] ?? 'application/octet-stream';
+    const range = request.headers.get('range');
+    const m = range && /bytes=(\d*)-(\d*)/.exec(range);
+
+    if (m) {
+      const start = m[1] ? Number(m[1]) : 0;
+      const end = m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
+      if (start >= size || start > end) {
+        return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } });
+      }
+      return new Response(Readable.toWeb(fs.createReadStream(file, { start, end })), {
+        status: 206,
+        headers: {
+          'Content-Type': type,
+          'Content-Length': String(end - start + 1),
+          'Content-Range': `bytes ${start}-${end}/${size}`,
+          'Accept-Ranges': 'bytes',
+        },
+      });
+    }
+
+    return new Response(Readable.toWeb(fs.createReadStream(file)), {
+      status: 200,
+      headers: {
+        'Content-Type': type,
+        'Content-Length': String(size),
+        'Accept-Ranges': 'bytes',
+      },
     });
   });
 }

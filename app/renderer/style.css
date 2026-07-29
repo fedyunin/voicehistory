@@ -94,9 +94,11 @@ button:disabled { opacity: .45; cursor: default; }
 
 /* ---------- banner and progress ---------- */
 .banner {
+  display: flex; align-items: center; gap: 12px;
   padding: 9px 16px; background: var(--accent-soft);
   border-bottom: 1px solid var(--line); font-size: 13.5px; flex: none;
 }
+.banner button { margin-left: auto; }
 .progress { padding: 9px 16px; border-bottom: 1px solid var(--line); background: var(--panel); flex: none; }
 .progress-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; font-size: 13.5px; }
 .progress-head #prog-cancel { margin-left: auto; }

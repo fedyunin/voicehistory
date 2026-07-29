@@ -55,9 +55,16 @@ async function refreshStats() {
     : `Queue is empty — ${done} transcribed.`;
 
   if (!s.recordings) {
-    banner('The archive is empty. Press “Import” to bring in a phone export.');
+    banner('The archive is empty — bring in a phone export to get started.',
+      { label: 'Import…', fn: openImport });
   } else if (!s.modelReady) {
-    banner(`Model ${s.model} not found — transcription is unavailable. Audio still imports and plays. Run: npm run setup`);
+    banner(`Model ${s.model} is not downloaded, so nothing can be transcribed. Audio still imports and plays. Run: npm run setup`);
+  } else if (pending && !s.job.running) {
+    // Import deliberately stops before transcription, which can run for days.
+    // Saying nothing left imported recordings sitting in the queue with no hint
+    // that a second, separate step exists.
+    banner(`${pending} recording${pending > 1 ? 's' : ''} waiting to be transcribed.`,
+      { label: 'Start transcribing', fn: () => api.transcribeStart({ order: 'named' }) });
   } else {
     banner(null);
   }
@@ -718,10 +725,21 @@ async function refreshAll() {
 
 /* ======================= formatting ======================= */
 
-function banner(text) {
+/**
+ * @param {string|null} text
+ * @param {{label: string, fn: Function}} [action]  a banner that states a problem
+ *   without offering the fix makes the user hunt for it.
+ */
+function banner(text, action) {
   const b = $('banner');
   b.hidden = !text;
-  if (text) b.textContent = text;
+  $('banner-text').textContent = text ?? '';
+  const btn = $('banner-action');
+  btn.hidden = !action;
+  if (action) {
+    btn.textContent = action.label;
+    btn.onclick = guard(action.fn);
+  }
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
