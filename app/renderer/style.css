@@ -298,3 +298,6 @@ dialog.wide-dlg { max-width: 660px; }
 }
 .settings-grid select:disabled { opacity: .5; }
 .plan-summary { display: block; padding-top: 7px; font-family: var(--mono); }
+
+.player .redo { margin-top: 8px; }
+.dlg-actions #jobs-all-again { margin-right: 0; }

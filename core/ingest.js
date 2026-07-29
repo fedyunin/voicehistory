@@ -239,6 +239,33 @@ function findRecordingByStem(stem) {
 /* ============================ PHASE 2 ============================ */
 
 /**
+ * Discards existing transcripts and recognizes them again — one recording, or the
+ * whole archive after changing the model or language.
+ *
+ * The old transcript file is deleted, not merely unlinked from the row: a stale
+ * file left on disk would be picked back up by the next reindex and quietly undo
+ * the redo.
+ */
+export async function retranscribe({ ids = null, order = 'named', shouldStop = () => false } = {}) {
+  ensureDirs();
+  db.open();
+  lock.acquire('transcribe');
+  db.recoverStale();
+  try {
+    const rows = db.requeueForTranscription(ids);
+    for (const r of rows) {
+      if (r.transcript_path) fs.rmSync(abs(r.transcript_path), { force: true });
+    }
+    logLine(`queued ${rows.length} recording${rows.length === 1 ? '' : 's'} for a fresh transcription`);
+    return runTranscribe({
+      order, shouldStop, onlyIds: rows.map((r) => r.id), limit: rows.length,
+    });
+  } finally {
+    lock.release();
+  }
+}
+
+/**
  * Drains the transcription queue. Safe to interrupt at any moment: the state
  * lives in recordings.transcript_status, not in memory.
  */
@@ -263,6 +290,7 @@ export async function transcribePending(opts = {}) {
 
 async function runTranscribe({
   model = undefined, limit = Infinity, order = 'named', shouldStop = () => false,
+  onlyIds = null,
 } = {}) {
   const pendingTotal = db.stats().byStatus.find((s) => s.s === 'pending')?.n ?? 0;
   const total = Math.min(pendingTotal, limit);
@@ -276,7 +304,7 @@ async function runTranscribe({
       db.finishJob(jobId, 'cancelled', nowIso(), JSON.stringify({ done, failed }));
       return { done, failed, total, cancelled: true };
     }
-    const [rec] = db.nextPending(1, order);
+    const [rec] = db.nextPending(1, order, onlyIds);
     if (!rec) break;
     db.markStatus(rec.id, 'running');
     const src = abs(rec.rel_path);

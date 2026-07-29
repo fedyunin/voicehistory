@@ -15,7 +15,7 @@ import * as runner from '../core/runner.js';
 import * as lock from '../core/lock.js';
 import * as appsettings from '../core/appsettings.js';
 import { list, recording, contacts, years } from '../core/search.js';
-import { importFiles, transcribePending, scanInbox, backfillProps } from '../core/ingest.js';
+import { importFiles, transcribePending, retranscribe, scanInbox, backfillProps } from '../core/ingest.js';
 import { reindex } from '../core/reindex.js';
 import { modelAvailable } from '../core/transcribe.js';
 import { vcardsToOverrides } from '../core/contactbook.js';
@@ -61,7 +61,7 @@ export function serve(port = 4321) {
 const NEEDS_ARCHIVE = new Set([
   'stats', 'contacts', 'years', 'list', 'recording', 'import/scan', 'import/start',
   'transcribe/start', 'reindex', 'contacts/rename', 'contacts/import', 'maintenance',
-  'maintenance/run', 'backfill/props', 'settings/update',
+  'maintenance/run', 'backfill/props', 'settings/update', 'transcribe/again',
 ]);
 
 async function handle(req, res) {
@@ -182,6 +182,13 @@ async function api(req, res, url) {
         order: body.order === 'newest' ? 'newest' : 'named',
         limit: body.limit ? Number(body.limit) : Infinity,
         shouldStop: runner.isCancelled,
+      })));
+    }
+
+    case 'transcribe/again': {
+      const { id } = await readJson(req);
+      return json(res, 200, runner.start('transcribe', () => retranscribe({
+        ids: id ? [Number(id)] : null, shouldStop: runner.isCancelled,
       })));
     }
 

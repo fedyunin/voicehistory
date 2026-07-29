@@ -150,7 +150,10 @@
 
   <p class="muted tiny">The queue lives in the database: stop any time and resume later from the same place.</p>
 
+  <p class="muted tiny">Already-transcribed recordings are skipped. To redo them — after changing the language or model — use the button below.</p>
+
   <div class="dlg-actions">
+    <button id="jobs-all-again" class="ghost" title="Discard every transcript and recognize everything again">Re-transcribe all</button>
     <button id="jobs-reindex" class="ghost" title="Rebuild the database from files on disk">Rebuild index</button>
     <button id="jobs-cancel" class="ghost">Close</button>
     <button id="jobs-go" class="primary">Start</button>

@@ -40,7 +40,7 @@ protocol.registerSchemesAsPrivileged([{
 // Filled by loadCore() before any window exists.
 let paths, abs, hasRoot, bus, db, runner, lock, appsettings, session, archive, config,
     maintenance, list, recording, contacts, years,
-    importFiles, transcribePending, scanInbox, backfillProps, reindex, modelAvailable,
+    importFiles, transcribePending, retranscribe, scanInbox, backfillProps, reindex, modelAvailable,
     vcardsToOverrides, choices, matchPlan;
 
 async function loadCore() {
@@ -56,7 +56,7 @@ async function loadCore() {
   config = await m('config.js');
   maintenance = await m('maintenance.js');
   ({ list, recording, contacts, years } = await m('search.js'));
-  ({ importFiles, transcribePending, scanInbox, backfillProps } = await m('ingest.js'));
+  ({ importFiles, transcribePending, retranscribe, scanInbox, backfillProps } = await m('ingest.js'));
   ({ reindex } = await m('reindex.js'));
   ({ modelAvailable } = await m('transcribe.js'));
   ({ vcardsToOverrides } = await m('contactbook.js'));
@@ -140,6 +140,11 @@ const API = {
     limit: limit ? Number(limit) : Infinity,
     shouldStop: runner.isCancelled,
   })),
+  /** Redo one recording, or the whole archive when no id is given. */
+  'transcribe/again': ({ id }) => runner.start('transcribe', () => retranscribe({
+    ids: id ? [Number(id)] : null,
+    shouldStop: runner.isCancelled,
+  })),
   reindex: () => runner.start('reindex', () => reindex()),
   cancel: () => { runner.cancel(); return { ok: true }; },
 
@@ -181,7 +186,7 @@ const API = {
 const NEEDS_ARCHIVE = new Set([
   'stats', 'contacts', 'years', 'list', 'recording', 'import/scan', 'import/start',
   'transcribe/start', 'reindex', 'contacts/rename', 'contacts/import', 'maintenance',
-  'maintenance/run', 'backfill/props', 'settings/update',
+  'maintenance/run', 'backfill/props', 'settings/update', 'transcribe/again',
 ]);
 
 /* ============================ media ============================ */

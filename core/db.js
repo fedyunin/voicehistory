@@ -268,17 +268,44 @@ export function setAudioPath(id, audioPath) {
  *   run takes days, so it is worth getting the voices of people you know done
  *   first rather than banks and delivery services.
  */
-export function nextPending(limit = 1, order = 'newest') {
+export function nextPending(limit = 1, order = 'newest', onlyIds = null) {
   const orderBy = order === 'named'
     ? `CASE WHEN c.kind = 'name' THEN 0 ELSE 1 END, r.started_at DESC`
     : 'r.started_at DESC';
+  // onlyIds narrows the queue to a chosen set, which is what makes re-doing one
+  // recording possible without the run wandering off to whatever else is pending.
+  const scope = onlyIds?.length ? `AND r.id IN (${onlyIds.map(() => '?').join(',')})` : '';
   return open().prepare(`
     SELECT r.id, r.rel_path, r.orig_name, r.duration_ms
     FROM recordings r LEFT JOIN contacts c ON c.id = r.contact_id
-    WHERE r.transcript_status = 'pending'
+    WHERE r.transcript_status = 'pending' ${scope}
     ORDER BY ${orderBy}
     LIMIT ?
-  `).all(limit);
+  `).all(...(onlyIds ?? []), limit);
+}
+
+/**
+ * Puts recordings back in the queue, discarding what was recognized before.
+ * Pass no ids to redo the whole archive — after changing the model or language,
+ * for instance.
+ *
+ * @returns {number[]} the ids actually queued
+ */
+export function requeueForTranscription(ids = null) {
+  const d = open();
+  const rows = ids?.length
+    ? d.prepare(`SELECT id, transcript_path FROM recordings WHERE id IN (${ids.map(() => '?').join(',')})`).all(...ids)
+    : d.prepare('SELECT id, transcript_path FROM recordings').all();
+
+  const clear = d.transaction((rows) => {
+    const st = d.prepare(`UPDATE recordings SET transcript_status = 'pending', transcript_error = NULL,
+                          transcript_path = NULL, model = NULL, language = NULL WHERE id = ?`);
+    const seg = d.prepare('DELETE FROM segments WHERE recording_id = ?');
+    const fts = d.prepare('DELETE FROM fts WHERE rowid = ?');
+    for (const r of rows) { st.run(r.id); seg.run(r.id); fts.run(r.id); }
+  });
+  clear(rows);
+  return rows;
 }
 
 export function markStatus(id, status, error = null) {

@@ -49,7 +49,7 @@ async function httpError(r) {
 // table lives here rather than leaking into ui.js.
 const WRITES = new Set([
   'archive/open', 'archive/forget', 'archive/choose', 'settings/update',
-  'import/start', 'transcribe/start', 'reindex', 'cancel',
+  'import/start', 'transcribe/start', 'transcribe/again', 'reindex', 'cancel',
   'contacts/rename', 'contacts/import', 'maintenance/run', 'backfill/props',
   'reveal/archive',
 ]);
@@ -79,6 +79,7 @@ export const api = {
   importStart:     (b) => call('import/start', b),
   transcribeStart: (b) => call('transcribe/start', b),
   reindex:         () => call('reindex'),
+  transcribeAgain: (id) => call('transcribe/again', id ? { id } : {}),
   cancel:          () => call('cancel'),
   renameContact:   (key, name) => call('contacts/rename', { key, name }),
   importVCard:     (vcard) => call('contacts/import', { vcard }),

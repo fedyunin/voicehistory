@@ -187,6 +187,16 @@ async function openRecording(id) {
   audio.preload = 'none';
   audio.src = api.mediaUrl(id);
   player.append(audio);
+
+  // Redo just this one. Useful after changing the language or model, and for the
+  // occasional recording the recognizer simply made a mess of.
+  const again = el('button', 'small redo', rec.transcript_status === 'done'
+    ? 'Transcribe again' : 'Transcribe this one');
+  again.onclick = guard(async () => {
+    again.disabled = true;
+    await api.transcribeAgain(id);
+  });
+  player.append(again);
   d.append(player);
 
   if (rec.segments.length) {
@@ -326,6 +336,11 @@ function wire() {
   $('btn-jobs').onclick = guard(async () => { await refreshStats(); $('dlg-jobs').showModal(); });
   $('jobs-cancel').onclick = () => $('dlg-jobs').close();
   $('jobs-go').onclick = guard(startTranscribe);
+  $('jobs-all-again').onclick = guard(async () => {
+    if (!confirm('Discard every transcript and recognize the whole archive again?')) return;
+    $('dlg-jobs').close();
+    await api.transcribeAgain();
+  });
   $('jobs-reindex').onclick = async () => {
     $('dlg-jobs').close();
     try { await api.reindex(); } catch (e) { banner(e.message); }
