@@ -304,6 +304,14 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
-  lock.release();
-  db.close();
+  // Closing the database under an in-flight job is what produced "the database
+  // connection is not open" against individual recordings. Ask the job to stop
+  // and leave teardown to process exit instead.
+  if (runner?.isBusy()) {
+    runner.cancel();
+    lock?.release();
+    return;
+  }
+  lock?.release();
+  db?.close();
 });

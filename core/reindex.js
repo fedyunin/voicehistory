@@ -21,8 +21,13 @@ const nowIso = () => new Date().toISOString();
 export async function reindex() {
   ensureDirs();
   db.open();
-  const { stale } = lock.acquire('reindex');
-  if (stale) db.recoverStale();
+  lock.acquire('reindex');
+  // Holding the writer lock is licence enough to reclaim: if it is ours, no other
+  // writer exists, so anything left 'running' is debris. Waiting for a "stale
+  // lock" signal instead missed the common case — a terminated process releases
+  // its lock on the way out, leaving the database row behind and nothing to
+  // notice it.
+  db.recoverStale();
   try {
     return await runReindex();
   } finally {

@@ -42,6 +42,13 @@ export function open() {
  */
 export function recoverStale() {
   const d = open();
+  // Working wavs from the dead run: large, regenerable, and this is the one
+  // moment we know for certain nobody is using them.
+  try {
+    for (const f of fs.readdirSync(paths.tmp)) {
+      if (f.endsWith('.wav')) fs.rmSync(path.join(paths.tmp, f), { force: true });
+    }
+  } catch { /* nothing to clean */ }
   const requeued = d.prepare(`UPDATE recordings SET transcript_status = 'pending'
                               WHERE transcript_status = 'running'`).run().changes;
   const jobs = d.prepare(`UPDATE jobs SET state = 'failed', message = 'interrupted',

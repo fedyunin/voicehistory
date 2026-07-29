@@ -49,8 +49,13 @@ export function scanInbox(sourceDir = paths.inbox) {
 export async function importFiles(sourceDir = paths.inbox, { concurrency = 4, mode = 'move' } = {}) {
   ensureDirs();
   db.open();
-  const { stale } = lock.acquire('import');
-  if (stale) db.recoverStale();
+  lock.acquire('import');
+  // Holding the writer lock is licence enough to reclaim: if it is ours, no other
+  // writer exists, so anything left 'running' is debris. Waiting for a "stale
+  // lock" signal instead missed the common case — a terminated process releases
+  // its lock on the way out, leaving the database row behind and nothing to
+  // notice it.
+  db.recoverStale();
   try {
     return await runImport(sourceDir, concurrency, mode);
   } finally {
@@ -242,8 +247,13 @@ export async function transcribePending(opts = {}) {
   db.open();
   // The lock is what stops the server and a second terminal from pulling the
   // same recordings off the queue and transcribing them twice.
-  const { stale } = lock.acquire('transcribe');
-  if (stale) db.recoverStale();
+  lock.acquire('transcribe');
+  // Holding the writer lock is licence enough to reclaim: if it is ours, no other
+  // writer exists, so anything left 'running' is debris. Waiting for a "stale
+  // lock" signal instead missed the common case — a terminated process releases
+  // its lock on the way out, leaving the database row behind and nothing to
+  // notice it.
+  db.recoverStale();
   try {
     return await runTranscribe(opts);
   } finally {
@@ -339,6 +349,15 @@ async function runTranscribe({
       done++;
       db.bumpJob(jobId, { done: 1 });
     } catch (e) {
+      // Being interrupted is not a failure of the recording. Cancelling a job, or
+      // quitting while one runs, used to leave recordings marked 'failed' with a
+      // teardown message attached — indistinguishable from audio that genuinely
+      // cannot be transcribed, and never retried.
+      if (shouldStop() || isTeardown(e)) {
+        db.markStatus(rec.id, 'pending');
+        db.finishJob(jobId, 'cancelled', nowIso(), JSON.stringify({ done, failed }));
+        return { done, failed, total, cancelled: true };
+      }
       db.markStatus(rec.id, 'failed', e.message);
       failed++;
       db.bumpJob(jobId, { failed: 1 });
@@ -357,6 +376,16 @@ async function runTranscribe({
 /* ============================ helpers ============================ */
 
 const tally = (r) => r.imported + r.duplicates + r.failed;
+
+/**
+ * Errors that mean the process is going away, not that this recording is bad:
+ * the database closing under an in-flight job, or the recognizer being killed
+ * with its parent.
+ */
+function isTeardown(e) {
+  const m = String(e?.message ?? '');
+  return /database connection is not open|SQLITE_MISUSE|SIGTERM|SIGKILL|killed/i.test(m);
+}
 
 /** recordings/YYYY/YYYY-MM/x.amr → transcripts/YYYY/YYYY-MM/x.json */
 function transcriptPathFor(rec) {
