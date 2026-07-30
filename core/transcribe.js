@@ -11,10 +11,12 @@ import path from 'node:path';
 import { paths, appPaths } from './paths.js';
 import { assertModelAllowed } from './license.js';
 import * as config from './config.js';
+import { signal } from './abort.js';
 
 const tmpDir = () => paths.tmp;
 
-const run = promisify(execFile);
+const exec = promisify(execFile);
+const run = (bin, args, opts = {}) => exec(bin, args, { ...opts, signal: signal() });
 
 /** Read through a function, not a constant: the archive can change at runtime. */
 export const defaultModel = () => config.MODEL;

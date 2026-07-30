@@ -20,6 +20,7 @@ import {
 import { transcribeWav, filterSegments, looksCollapsed } from './transcribe.js';
 import { progress, logLine } from './events.js';
 import * as lock from './lock.js';
+import * as abort from './abort.js';
 
 const nowIso = () => new Date().toISOString();
 
@@ -306,7 +307,12 @@ async function runTranscribe({
     }
     const [rec] = db.nextPending(1, order, onlyIds);
     if (!rec) break;
+    abort.begin();
     db.markStatus(rec.id, 'running');
+    // Announce the file as work begins, not when it ends. A 27-minute call takes
+    // minutes, and until it finished the interface showed no sign of which
+    // recording was being worked on.
+    progress({ phase: 'transcribe', done: done + failed, total, file: rec.orig_name });
     const src = abs(rec.rel_path);
     const wav = path.join(paths.tmp, `${rec.id}.wav`);
 
@@ -391,6 +397,7 @@ async function runTranscribe({
       db.bumpJob(jobId, { failed: 1 });
       logLine(`transcription failed for ${rec.orig_name}: ${e.message}`);
     } finally {
+      abort.end();
       fs.rmSync(wav, { force: true });
     }
 
@@ -419,6 +426,7 @@ function isTeardown(e) {
   // mid-run. Scoped to .tmp/ on purpose — ENOENT elsewhere, such as a missing
   // model, is a real problem worth reporting.
   if (/ENOENT/.test(m) && /[/\\]\.tmp[/\\]/.test(m)) return true;
+  if (abort.isAbortError(e) || /aborted|ABORT_ERR/i.test(m)) return true;
   return /database connection is not open|SQLITE_MISUSE|SIGTERM|SIGKILL|killed/i.test(m);
 }
 

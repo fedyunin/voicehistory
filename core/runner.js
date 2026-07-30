@@ -4,6 +4,7 @@
 // and then run for hours. State lives here rather than in the UI: close the
 // tab and the job keeps going; reopen it and the progress is still there.
 import { bus } from './events.js';
+import * as abort from './abort.js';
 
 let current = null;      // {kind, startedAt, done, total, file, cancelled}
 
@@ -27,7 +28,13 @@ export function isCancelled() {
 }
 
 export function cancel() {
-  if (current) current.cancelled = true;
+  if (!current) return false;
+  current.cancelled = true;
+  // Ending the recognizer now rather than at the end of the current file. The
+  // recording returns to the queue, and Stop stops instead of appearing stuck.
+  abort.abort();
+  bus.emit('job', { ...current, running: true, stopping: true });
+  return true;
 }
 
 /**

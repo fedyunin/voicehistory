@@ -364,7 +364,14 @@ function wire() {
     try { await api.reindex(); } catch (e) { banner(e.message); }
   };
 
-  $('prog-cancel').onclick = () => api.cancel();
+  $('prog-cancel').onclick = guard(async () => {
+    // Say so immediately. Stopping ends the recognizer mid-file, but the loop
+    // still has to unwind, and a button that looks inert invites a second click.
+    const b = $('prog-cancel');
+    b.disabled = true;
+    b.textContent = 'Stopping…';
+    await api.cancel();
+  });
 
   $('btn-settings').onclick = guard(openSettings);
   $('set-close').onclick = () => { $('dlg-settings').close(); refreshAll(); };
@@ -804,20 +811,54 @@ function onProgress(p) {
 }
 
 let refreshTimer = null;
+let jobStartedAt = null;
+
+/** Linear projection from elapsed time — crude, and honest about being a guess. */
+function etaText(done, total) {
+  if (!jobStartedAt || !done || !total || done >= total) return '';
+  const elapsed = Date.now() - jobStartedAt;
+  const perItem = elapsed / done;
+  const left = perItem * (total - done);
+  const rate = 3600000 / perItem;
+  return `${fmtSpan(left)} left · ${rate < 100 ? rate.toFixed(0) : Math.round(rate)}/hour`;
+}
+
+function fmtSpan(ms) {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  return h < 24 ? `${h}h ${m % 60}m` : `${Math.floor(h / 24)}d ${h % 24}h`;
+}
 
 function onJob(j) {
   if (j.running) { showProgress(j); return; }
+  jobStartedAt = null;
   $('progress').hidden = true;
+  const b = $('prog-cancel');
+  b.disabled = false;
+  b.textContent = 'Stop';
   banner(j.error ? `Error: ${j.error}` : null);
   refreshAll();
 }
 
-function showProgress({ kind, done = 0, total = 0, file }) {
+function showProgress({ kind, done = 0, total = 0, file, startedAt, stopping }) {
   $('progress').hidden = false;
-  $('prog-label').textContent = LABEL[kind] ?? kind;
+  $('prog-label').textContent = stopping ? 'Stopping…' : (LABEL[kind] ?? kind);
   $('prog-count').textContent = total ? `${done} of ${total}` : '';
   $('prog-fill').style.width = total ? `${(done / total) * 100}%` : '0';
   if (file) $('prog-file').textContent = file;
+
+  // A run measured in tens of hours needs to say when it will be done. Without
+  // it the only honest answer to "how long" was to go and count in the terminal.
+  if (startedAt) jobStartedAt = Date.parse(startedAt);
+  $('prog-eta').textContent = etaText(done, total);
+  if (stopping) {
+    const b = $('prog-cancel');
+    b.disabled = true;
+    b.textContent = 'Stopping…';
+  }
 
   // Refresh the list during long jobs, but not on every single event.
   if (!refreshTimer) {

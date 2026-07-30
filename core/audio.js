@@ -10,8 +10,12 @@ import { promisify } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as config from './config.js';
+import { signal } from './abort.js';
 
-const run = promisify(execFile);
+const exec = promisify(execFile);
+
+/** Every spawn carries the job's cancellation signal, so Stop reaches ffmpeg too. */
+const run = (bin, args, opts = {}) => exec(bin, args, { ...opts, signal: signal() });
 
 /** m4a/AAC plays everywhere including Safari. For a product → 'opus' (patent-free). */
 export const PLAYBACK_FORMAT = 'm4a';
