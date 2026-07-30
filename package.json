@@ -18,7 +18,9 @@
     "dist": "electron-builder --publish never",
     "dist:mac": "electron-builder --mac --publish never",
     "dist:win": "electron-builder --win --publish never",
-    "dist:linux": "electron-builder --linux --publish never"
+    "dist:linux": "electron-builder --linux --publish never",
+    "demo": "node scripts/demo-archive.mjs",
+    "screenshots": "node scripts/screenshots.mjs"
   },
   "keywords": [
     "whisper",
@@ -52,7 +54,8 @@
   "homepage": "https://github.com/fedyunin/voicehistory#readme",
   "devDependencies": {
     "electron": "^43.2.0",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "playwright-core": "^1.62.0"
   },
   "main": "app/main.cjs",
   "build": {

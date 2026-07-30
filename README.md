@@ -20,8 +20,10 @@ exported from [Cube ACR](https://cubeacr.app/) as 8 kHz AMR files.
 
 ![The archive view: years and people on the left, calls in the middle, player and synced transcript on the right](docs/01-archive.png)
 
-<sub>Screenshots use sample data. The interface follows your system light/dark
-setting — <a href="docs/01-archive-dark.png">dark version</a>.</sub>
+<sub>Screenshots use a generated demo archive — invented people, invented
+conversations — and are produced by <code>npm run demo &amp;&amp; npm run screenshots</code>,
+so they cannot drift from the interface. It follows your system light/dark
+setting: <a href="docs/01-archive-dark.png">dark version</a>.</sub>
 
 ## Quick start
 
@@ -68,19 +70,25 @@ Everything happens through three buttons.
 list within minutes.
 
 **Transcribe** — drains a queue held in the database. Stop and resume any time;
-transcripts appear as they land. Follow progress in the browser, or from a
-terminal with `npm run watch`.
+transcripts appear as they land. Progress, the file in flight and a time
+estimate stay on screen, and stopping takes effect within a second rather than
+at the end of the current recording. Follow it from a terminal instead with
+`npm run watch`.
 
 **People** — imports a `.vcf` address book from your phone, or lets you type
 names in. Numbers are normalized so the same person written two different ways
 becomes one contact.
 
 Then: browse by year or person, search across every transcript, and click any
-line of a transcript to jump to that moment in the audio.
+line of a transcript to jump to that moment in the audio. Searching and jumping
+to a result seeks the audio to the phrase that matched, not to the start of the
+call.
 
 | Full-text search across every transcript | Naming the people behind the numbers |
 |---|---|
-| ![Search results with matches highlighted in context](docs/02-search.png) | ![The People dialog, listing contacts with editable names](docs/03-people.png) |
+| ![Search results, each showing the matching phrase highlighted in context](docs/02-search.png) | ![The People dialog, listing contacts with editable names](docs/04-people.png) |
+| Filtering by person or year, and clearing it again | The transcription queue, resumable and skippable |
+| ![The list narrowed to one person, with a chip naming the active filter and an × to remove it](docs/03-filters.png) | ![The Transcription dialog: queue counts, ordering choice, and re-transcribe](docs/05-transcribe.png) |
 
 ## How it works
 
@@ -182,6 +190,9 @@ npm run watch      follow a job running elsewhere
 npm run jobs       history of past runs
 npm run reindex    rebuild the database from files
 
+npm run demo /tmp/vh-demo   build an archive of invented data to try things on
+npm run screenshots /tmp/vh-demo   regenerate the README screenshots from it
+
 node cli/vh.js archive               show the current archive and recent ones
 node cli/vh.js archive /path/to/dir  open or create an archive there
 ```
@@ -227,7 +238,7 @@ Settings shows what is on disk and what each destructive action would cost.
 Anything irreversible states what it destroys and what survives, and needs a
 phrase typed to confirm.
 
-![The Settings dialog showing disk usage and a danger zone where each action states what it destroys and what survives](docs/05-settings.png)
+![The Settings dialog showing disk usage and a danger zone where each action states what it destroys and what survives](docs/06-settings.png)
 
 ## Privacy and legality
 
