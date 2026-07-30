@@ -38,15 +38,15 @@ protocol.registerSchemesAsPrivileged([{
 }]);
 
 // Filled by loadCore() before any window exists.
-let paths, abs, hasRoot, bus, db, runner, lock, appsettings, session, archive, config,
+let paths, abs, hasRoot, bus, progress, db, runner, lock, appsettings, session, archive, config,
     maintenance, list, recording, contacts, years,
     importFiles, transcribePending, retranscribe, scanInbox, backfillProps, reindex, modelAvailable,
-    vcardsToOverrides, choices, matchPlan;
+    vcardsToOverrides, choices, matchPlan, tools, models, abort;
 
 async function loadCore() {
   const m = async (p) => import(pathToFileURL(path.join(HERE, '..', 'core', p)).href);
   ({ paths, abs, hasRoot } = await m('paths.js'));
-  ({ bus } = await m('events.js'));
+  ({ bus, progress } = await m('events.js'));
   db = await m('db.js');
   runner = await m('runner.js');
   lock = await m('lock.js');
@@ -61,11 +61,51 @@ async function loadCore() {
   ({ modelAvailable } = await m('transcribe.js'));
   ({ vcardsToOverrides } = await m('contactbook.js'));
   ({ all: choices, matchPlan } = await m('choices.js'));
+  tools = await m('tools.js');
+  models = await m('models.js');
+  abort = await m('abort.js');
 }
 
 let win = null;
 
 /* ============================ API ============================ */
+
+/** Mirrors cli/server.js setupState(): what is installed, and where. */
+async function setupState() {
+  const probe = await tools.probe();
+  return {
+    ...probe,
+    model: {
+      name: config.MODEL,
+      ok: models.available(),
+      path: models.pathFor(),
+      bytes: models.sizeOf(),
+      url: models.urlFor(),
+      // Size comes from the model catalogue rather than a constant: the sizes
+      // differ by an order of magnitude, and a button promising 1.5 GB before a
+      // 3 GB download is a small lie the interface does not need to tell.
+      size: (choices().models.find((m) => m.id === config.MODEL) ?? {}).size ?? null,
+      why: 'the speech model the recognizer reads',
+    },
+    ready: probe.ffmpeg.ok && probe.ffprobe.ok && probe['whisper-cli'].ok && models.available(),
+  };
+}
+
+/** A normal job, so the model download gets the progress bar and Stop for free. */
+function startModelDownload() {
+  return runner.start('model', async () => {
+    abort.begin();
+    try {
+      return await models.fetch(config.MODEL, {
+        signal: abort.signal(),
+        onProgress: ({ received, total }) =>
+          progress({ phase: 'model', done: received, total, file: `ggml-${config.MODEL}.bin` }),
+      });
+    } finally {
+      abort.end();
+    }
+  });
+}
 
 /**
  * The contract. Deliberately identical in name and shape to the HTTP routes, so
@@ -74,6 +114,13 @@ let win = null;
 const API = {
   /* --- archive --- */
   archive: () => session.archiveState(),
+
+  setup: () => setupState(),
+  'setup/model': () => {
+    if (models.available()) return { ok: true, already: true };
+    if (runner.isBusy()) return { error: `Already running: ${runner.state().kind}` };
+    return startModelDownload();
+  },
   'archive/inspect': ({ dir }) => archive.inspect(dir ?? ''),
   'archive/open': ({ dir }) => {
     if (runner.isBusy()) throw new Error('A job is running — stop it before switching archives');

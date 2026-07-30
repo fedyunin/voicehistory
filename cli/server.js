@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { paths, abs, ensureDirs, hasRoot } from '../core/paths.js';
-import { bus } from '../core/events.js';
+import { bus, progress } from '../core/events.js';
 import * as db from '../core/db.js';
 import * as runner from '../core/runner.js';
 import * as lock from '../core/lock.js';
@@ -18,12 +18,15 @@ import { list, recording, contacts, years } from '../core/search.js';
 import { importFiles, transcribePending, retranscribe, scanInbox, backfillProps } from '../core/ingest.js';
 import { reindex } from '../core/reindex.js';
 import { modelAvailable } from '../core/transcribe.js';
+import * as tools from '../core/tools.js';
+import * as models from '../core/models.js';
+import * as abort from '../core/abort.js';
 import { vcardsToOverrides } from '../core/contactbook.js';
 import * as maintenance from '../core/maintenance.js';
 import * as config from '../core/config.js';
 import * as session from '../core/session.js';
 import * as archiveMod from '../core/archive.js';
-import { all as choices, matchPlan } from '../core/choices.js';
+import { all as choicesList, matchPlan } from '../core/choices.js';
 
 const WEB = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'app', 'renderer');
 
@@ -78,6 +81,48 @@ async function handle(req, res) {
 
 /* ------------------------- API ------------------------- */
 
+/**
+ * Setup state: what the app needs before it can do anything, and where each
+ * piece was found. Shared by the CLI's doctor and the interface.
+ */
+async function setupState() {
+  const probe = await tools.probe();
+  return {
+    ...probe,
+    model: {
+      name: config.MODEL,
+      ok: models.available(),
+      path: models.pathFor(),
+      bytes: models.sizeOf(),
+      url: models.urlFor(),
+      // Size comes from the model catalogue rather than a constant: the sizes
+      // differ by an order of magnitude, and a button promising 1.5 GB before a
+      // 3 GB download is a small lie the interface does not need to tell.
+      size: (choicesList().models.find((m) => m.id === config.MODEL) ?? {}).size ?? null,
+      why: 'the speech model the recognizer reads',
+    },
+    ready: probe.ffmpeg.ok && probe.ffprobe.ok && probe['whisper-cli'].ok && models.available(),
+  };
+}
+
+/** Downloads the model as a normal job, so it gets progress and Stop for free. */
+function startModelDownload() {
+  return runner.start('model', async () => {
+    abort.begin();
+    try {
+      const r = await models.fetch(config.MODEL, {
+        signal: abort.signal(),
+        onProgress: ({ received, total }) =>
+          progress({ phase: 'model', done: received, total, file: `ggml-${config.MODEL}.bin` }),
+      });
+      return r;
+    } finally {
+      abort.end();
+    }
+  });
+}
+
+
 async function api(req, res, url) {
   const p = url.pathname.slice(5);
   const q = url.searchParams;
@@ -89,6 +134,15 @@ async function api(req, res, url) {
   switch (p) {
     case 'archive':
       return json(res, 200, session.archiveState());
+
+    case 'setup':
+      return json(res, 200, await setupState());
+
+    case 'setup/model': {
+      if (models.available()) return json(res, 200, { ok: true, already: true });
+      if (runner.isBusy()) return json(res, 409, { error: `Already running: ${runner.state().kind}` });
+      return json(res, 200, startModelDownload());
+    }
 
     case 'archive/inspect':
       return json(res, 200, archiveMod.inspect(q.get('dir') ?? ''));
@@ -220,7 +274,7 @@ async function api(req, res, url) {
 
     // what each destructive action would cost, plus current disk usage
     case 'choices':
-      return json(res, 200, { ...choices(), currentPlan: matchPlan(config.NUMBERING) });
+      return json(res, 200, { ...choicesList(), currentPlan: matchPlan(config.NUMBERING) });
 
     case 'maintenance': {
       const specs = Object.fromEntries(

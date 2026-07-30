@@ -107,6 +107,30 @@ async function main() {
   await dialog('#btn-settings', '#dlg-settings', '06-settings');
 
   await app.close();
+
+  // 07 — the requirements dialog, which only appears when something is missing.
+  // Asking for a model that is genuinely not downloaded makes that state real
+  // rather than mocked: the dialog opens itself, as it would on a fresh machine.
+  // Pointing VH_MODELS_DIR at an empty folder would not do it — the search looks
+  // in every known location, on purpose, so an existing model is never missed.
+  const fresh = await electron.launch({
+    args: [path.join(repo, 'app', 'main.cjs')],
+    env: {
+      ...process.env,
+      VH_ROOT: root,
+      VH_APP_CONFIG_DIR: path.join(root, '.tmp', 'screenshot-config'),
+      VH_MODEL: 'large-v3',
+      ELECTRON_RUN_AS_NODE: undefined,
+    },
+  });
+  const p2 = await fresh.firstWindow();
+  await p2.setViewportSize({ width: 1420, height: 900 });
+  await p2.waitForSelector('#dlg-setup[open]', { timeout: 30_000 });
+  await p2.waitForTimeout(900);
+  await p2.screenshot({ path: path.join(outDir, '07-setup.png') });
+  shots.push('07-setup');
+  console.log('  07-setup.png');
+  await fresh.close();
 }
 
 main().then(

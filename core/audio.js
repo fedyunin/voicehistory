@@ -11,11 +11,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as config from './config.js';
 import { signal } from './abort.js';
+import { bin } from './tools.js';
 
 const exec = promisify(execFile);
 
-/** Every spawn carries the job's cancellation signal, so Stop reaches ffmpeg too. */
-const run = (bin, args, opts = {}) => exec(bin, args, { ...opts, signal: signal() });
+/**
+ * Every spawn carries the job's cancellation signal, so Stop reaches ffmpeg too,
+ * and resolves the tool to an absolute path: a packaged app launched from the
+ * Dock does not inherit a shell's PATH. See tools.js.
+ */
+const run = (name, args, opts = {}) => exec(bin(name), args, { ...opts, signal: signal() });
 
 /** m4a/AAC plays everywhere including Safari. For a product → 'opus' (patent-free). */
 export const PLAYBACK_FORMAT = 'm4a';

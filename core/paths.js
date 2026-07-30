@@ -19,6 +19,7 @@
 // can switch archives without restarting the process. Consumers must therefore
 // read `paths.x` at call time and never destructure at module level.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 /** Nothing is open yet on first run; the interface asks for a folder. */
@@ -72,8 +73,59 @@ export function abs(relPath) {
 /** Speech models and helper binaries belong to the installation, not the archive. */
 export const appPaths = {
   bin: path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', 'bin'),
-  get models() { return path.join(appPaths.bin, 'models'); },
+  /** Where a model would be WRITTEN. To find one, use modelDirs(). */
+  get models() { return modelsWriteDir(); },
 };
+
+/**
+ * Per-user data location, for things too large to belong in a config folder.
+ * Distinct from appsettings.configDir() on purpose: settings are small and worth
+ * syncing or backing up, a 1.5 GB speech model is neither.
+ */
+function dataDir() {
+  const home = os.homedir();
+  if (process.platform === 'darwin') return path.join(home, 'Library', 'Application Support', 'voicehistory');
+  if (process.platform === 'win32') {
+    return path.join(process.env.LOCALAPPDATA ?? path.join(home, 'AppData', 'Local'), 'voicehistory');
+  }
+  return path.join(process.env.XDG_DATA_HOME ?? path.join(home, '.local', 'share'), 'voicehistory');
+}
+
+/**
+ * Everywhere a model may already be, most specific first.
+ *
+ * `bin/models` inside the checkout comes before the per-user folder so that an
+ * existing development setup keeps working untouched — re-downloading 1.5 GB
+ * because the code moved is not an acceptable upgrade.
+ */
+export function modelDirs() {
+  const dirs = [];
+  if (process.env.VH_MODELS_DIR) dirs.push(path.resolve(process.env.VH_MODELS_DIR));
+  dirs.push(path.join(appPaths.bin, 'models'));
+  dirs.push(path.join(dataDir(), 'models'));
+  return [...new Set(dirs)];
+}
+
+/**
+ * The first of those that can actually be written to.
+ *
+ * In a packaged app `bin/` resolves inside app.asar — a read-only archive — so
+ * the per-user folder is the only candidate that works. This is why an in-app
+ * download had to wait for this function: there was previously nowhere to put
+ * the file.
+ */
+export function modelsWriteDir() {
+  for (const dir of modelDirs()) {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.accessSync(dir, fs.constants.W_OK);
+      return dir;
+    } catch { /* try the next one */ }
+  }
+  // Every candidate refused. Return the per-user path anyway so the caller
+  // fails while trying to write, with a path in the message.
+  return path.join(dataDir(), 'models');
+}
 
 export function ensureDirs() {
   requireRoot();

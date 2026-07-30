@@ -51,7 +51,7 @@ const WRITES = new Set([
   'archive/open', 'archive/forget', 'archive/choose', 'settings/update',
   'import/start', 'transcribe/start', 'transcribe/again', 'reindex', 'cancel',
   'contacts/rename', 'contacts/import', 'maintenance/run', 'backfill/props',
-  'reveal/archive',
+  'reveal/archive', 'setup/model',
 ]);
 
 const call = (method, args = {}) => {
@@ -85,6 +85,8 @@ export const api = {
   importVCard:     (vcard) => call('contacts/import', { vcard }),
   choices:         () => call('choices'),
   maintenance:     () => call('maintenance'),
+  setup:           () => call('setup'),
+  setupModel:      () => call('setup/model'),
   maintenanceRun:  (action, confirm) => call('maintenance/run', { action, confirm }),
   backfillProps:   (dir) => call('backfill/props', { dir }),
 

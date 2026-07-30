@@ -9,8 +9,8 @@ import * as db from '../core/db.js';
 import { importFiles, transcribePending, scanInbox } from '../core/ingest.js';
 import { reindex } from '../core/reindex.js';
 import { contacts, years } from '../core/search.js';
-import { ffmpegAvailable } from '../core/audio.js';
-import { whisperAvailable, modelAvailable, modelPath } from '../core/transcribe.js';
+import { modelAvailable, modelPath } from '../core/transcribe.js';
+import * as tools from '../core/tools.js';
 import { tier } from '../core/license.js';
 import { serve } from './server.js';
 import * as session from '../core/session.js';
@@ -60,12 +60,21 @@ try {
 
 async function doctor() {
   const restored = session.restoreArchive();
+  // Same probe the app's setup screen uses, so the two can never disagree about
+  // what counts as installed — and it reports WHERE each tool was found, which
+  // is the useful part when PATH is the problem.
+  const t = await tools.probe();
   const rows = [
-    ['archive', restored && !restored.missing ? paths.root : 'none open — run npm start to choose one'],
+    // Report WHY, not just that it is not open: a swallowed error here once
+    // looked exactly like "no archive chosen yet".
+    ['archive', restored && !restored.missing ? paths.root
+      : restored?.error ? `${restored.root} — could not open: ${restored.error}`
+      : 'none open — run npm start to choose one'],
     ['app settings', appsettings.settingsFile()],
-    ['ffmpeg', (await ffmpegAvailable()) ? 'found' : 'MISSING — brew install ffmpeg'],
-    ['whisper-cli', (await whisperAvailable()) ? 'found' : 'MISSING — brew install whisper-cpp'],
-    [`model ${config.MODEL}`, modelAvailable() ? 'found' : 'MISSING — run: npm run setup'],
+    ['ffmpeg', t.ffmpeg.ok ? t.ffmpeg.path : `MISSING — ${t.installCommand}`],
+    ['ffprobe', t.ffprobe.ok ? t.ffprobe.path : `MISSING — ${t.installCommand}`],
+    ['whisper-cli', t['whisper-cli'].ok ? t['whisper-cli'].path : `MISSING — ${t.installCommand}`],
+    [`model ${config.MODEL}`, modelAvailable() ? modelPath() : 'MISSING — run: npm run setup'],
     ['tier', tier()],
     ['files waiting in inbox/', hasRoot() ? String(scanInbox().length) : '—'],
   ];

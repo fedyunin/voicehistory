@@ -264,6 +264,52 @@ If this were ever packaged commercially, ffmpeg would need replacing:
 opencore-amr (Apache-2.0) to decode plus libopus (BSD) to encode, avoiding
 ffmpeg's GPL/LGPL obligations entirely.
 
+## Finding the external tools
+
+Spawning `ffmpeg` by bare name works in development and fails once installed.
+A GUI application does not inherit the PATH a shell builds from a login profile —
+on macOS it gets launchd's environment, roughly `/usr/bin:/bin:/usr/sbin:/sbin`.
+Homebrew lives in `/opt/homebrew/bin`, which is not in it. So the first packaged
+build reported ffmpeg missing on a machine with ffmpeg plainly installed, and
+`npm run app` from a terminal worked on the same machine minutes earlier. That
+contradiction is the whole bug, and it is worth stating because nothing about it
+is visible while developing.
+
+`core/tools.js` searches PATH first and then the places these tools actually
+install to, and everything spawns by absolute path. Measured with a launchd-style
+environment: bare `ffmpeg` gives ENOENT, the resolver returns
+`/opt/homebrew/bin/ffmpeg`.
+
+The resolver caches, including misses, so a repeated probe costs nothing — and
+exposes `reload()`, because otherwise the interface's “Check again” button could
+never succeed after the user installed something.
+
+`probe()` reports where each tool was found, not just that it was. When PATH is
+the problem, the path is the answer.
+
+## The model has to live somewhere writable
+
+`bin/models` next to the code is fine in a checkout and impossible in a packaged
+app, where that path resolves inside `app.asar` — a read-only archive. So an
+in-app download had nowhere to write, which is why `paths.js` now resolves a
+per-user data directory.
+
+Reads search every known location; writes go to the first writable one, with the
+checkout ahead of the per-user folder. A developer with 1.5 GB already downloaded
+must not be made to fetch it again because the code moved. A consequence worth
+knowing: pointing `VH_MODELS_DIR` at an empty folder does not hide a model
+installed elsewhere, since the search is deliberately exhaustive.
+
+Downloads land in a `.part` file and are renamed on success. A truncated model
+that looks complete fails later, inside the recognizer, with an error that says
+nothing about the real cause.
+
+The binaries are not fetched the same way, and that asymmetry is deliberate: the
+model is one file of published weights with no substitute, while shipping ffmpeg
+means distributing someone else's software under GPL/LGPL obligations, from
+sources that differ per platform, with checksums to verify. That is an installer,
+not a feature.
+
 ## Packaging
 
 Installers are built by electron-builder, one runner per platform, because

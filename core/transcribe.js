@@ -8,15 +8,17 @@ import { promisify } from 'node:util';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { paths, appPaths } from './paths.js';
+import { paths } from './paths.js';
 import { assertModelAllowed } from './license.js';
 import * as config from './config.js';
+import * as models from './models.js';
+import * as tools from './tools.js';
 import { signal } from './abort.js';
 
 const tmpDir = () => paths.tmp;
 
 const exec = promisify(execFile);
-const run = (bin, args, opts = {}) => exec(bin, args, { ...opts, signal: signal() });
+const run = (binPath, args, opts = {}) => exec(binPath, args, { ...opts, signal: signal() });
 
 /** Read through a function, not a constant: the archive can change at runtime. */
 export const defaultModel = () => config.MODEL;
@@ -131,19 +133,19 @@ export function looksCollapsed(segments) {
   return caps / words < 0.03 && punct / words < 0.08;
 }
 
-/** Prefer a binary shipped next to the app, fall back to PATH. */
+/**
+ * A bundled binary wins, otherwise PATH, otherwise the places these tools
+ * actually install to — which is what makes this work from a packaged app.
+ */
 export function resolveBinary() {
-  const bundled = path.join(appPaths.bin, process.platform === 'win32' ? 'whisper-cli.exe' : 'whisper-cli');
-  return fs.existsSync(bundled) ? bundled : 'whisper-cli';
+  return tools.bin('whisper-cli');
 }
 
-export function modelPath(model = config.MODEL) {
-  return path.join(appPaths.models, `ggml-${model}.bin`);
-}
-
-export function modelAvailable(model = config.MODEL) {
-  return fs.existsSync(modelPath(model));
-}
+// Model location and download live in models.js, so the CLI's setup and the
+// app's setup screen share one implementation. Re-exported because callers
+// across the project already ask transcribe.js for these.
+export const modelPath = models.pathFor;
+export const modelAvailable = models.available;
 
 export async function whisperAvailable() {
   try { await run(resolveBinary(), ['--help']); return true; } catch { return false; }

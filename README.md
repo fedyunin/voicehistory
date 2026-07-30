@@ -39,6 +39,9 @@ npm run app        # desktop window
 npm start          # or in a browser → http://127.0.0.1:4321
 ```
 
+You can skip `npm run setup` — the app checks the same things on launch and can
+download the model itself.
+
 Both open the same archive and the same interface; the desktop window adds a
 native folder picker and keeps running without a terminal.
 
@@ -72,9 +75,25 @@ Developer ID — so the first launch needs a nudge past the OS:
   refuses: `xattr -cr "/Applications/Voice History.app"`.
 - **Windows** — *More info* → *Run anyway*.
 
-They also still expect `ffmpeg` and `whisper-cli` on your `PATH` — the
-recognizer and its model are hundreds of megabytes each and are deliberately not
-bundled. Running from source is the better-supported path today.
+They also expect `ffmpeg` and `whisper-cli` to be installed — see below.
+
+## What it needs installed
+
+Two established tools do the audio work, rather than this project reimplementing
+them: [ffmpeg](https://ffmpeg.org/) to decode recordings and
+[whisper.cpp](https://github.com/ggml-org/whisper.cpp) to recognize speech. On
+macOS both are one command: `brew install ffmpeg whisper-cpp`.
+
+The app checks on launch and says what is missing, where each tool was found, and
+what to run. The speech model it downloads for you.
+
+![The Requirements dialog: the speech model with a Download button, and ffmpeg, ffprobe and whisper-cli each shown with the absolute path they were found at](docs/07-setup.png)
+
+Binaries are left to you on purpose. Fetching them would mean shipping an
+installer for someone else's software, taking on ffmpeg's licensing, and
+verifying downloads — while the model is a single file of published weights that
+nothing else can substitute. `npm run doctor` prints the same report in a
+terminal.
 
 ## Using it
 

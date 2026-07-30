@@ -320,3 +320,38 @@ dialog.wide-dlg { max-width: 660px; }
 }
 .filter-chip .x { color: var(--muted); font-size: 14px; line-height: 1; }
 .filter-chip:hover .x { color: var(--accent); }
+
+/* ---------------- requirements dialog ---------------- */
+
+.setup-list { display: grid; gap: 8px; margin: 14px 0; }
+
+.setup-row {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  gap: 10px;
+  align-items: start;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.setup-row .mark { font-size: 15px; line-height: 1.3; }
+.setup-row.ok .mark { color: #3f8f5f; }
+.setup-row.missing { border-color: var(--accent); }
+.setup-row.missing .mark { color: var(--accent); }
+.setup-row .name { font-weight: 600; }
+.setup-row .where {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.setup-install { display: grid; gap: 6px; }
+.setup-install code {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}

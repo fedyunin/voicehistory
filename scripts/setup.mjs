@@ -1,100 +1,47 @@
 #!/usr/bin/env node
-// One-command bootstrap: verify tools, create folders, fetch the speech model.
+// One-command bootstrap: verify tools, fetch the speech model.
 // Safe to re-run — everything it does is idempotent.
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-import fs from 'node:fs';
-import path from 'node:path';
-import https from 'node:https';
-import { appPaths } from '../core/paths.js';
-import { modelPath } from '../core/transcribe.js';
-import { MODEL as DEFAULT_MODEL } from '../core/config.js';
-
-const run = promisify(execFile);
-
-const MODEL_URL = (name) =>
-  `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-${name}.bin`;
-
-const INSTALL_HINTS = {
-  darwin: 'brew install ffmpeg whisper-cpp',
-  linux: 'sudo apt install ffmpeg  # and build whisper.cpp from source',
-  win32: 'winget install ffmpeg  # and grab a whisper.cpp release build',
-};
-
-let failed = false;
+//
+// The work itself lives in core/: tools.js decides what counts as installed and
+// models.js does the download, so this script and the app's setup screen can
+// never disagree with each other.
+import * as tools from '../core/tools.js';
+import * as models from '../core/models.js';
+import { MODEL } from '../core/config.js';
 
 console.log('\nSetting up voicehistory\n');
 
-fs.mkdirSync(appPaths.models, { recursive: true });
-console.log(`  ✔ model folder ready: ${appPaths.models}`);
+const probe = await tools.probe();
+for (const key of ['ffmpeg', 'ffprobe', 'whisper-cli']) {
+  const t = probe[key];
+  console.log(t.ok ? `  ✔ ${key}  ${t.path}` : `  ✖ ${key} NOT found — ${t.why}`);
+}
 
-await check('ffmpeg', ['-version'], 'ffmpeg');
-await check('whisper-cli', ['--help'], 'whisper.cpp');
-await fetchModel();
+const missing = ['ffmpeg', 'ffprobe', 'whisper-cli'].filter((k) => !probe[k].ok);
+let failed = missing.length > 0;
 
-if (failed) {
-  console.log(`\nSome tools are missing. Install them with:\n\n    ${INSTALL_HINTS[process.platform] ?? INSTALL_HINTS.linux}\n`);
-  process.exitCode = 1;
+if (models.available(MODEL)) {
+  console.log(`  ✔ model ${MODEL}  ${models.pathFor(MODEL)}`);
 } else {
-  console.log('\nAll set. Start the app with:\n\n    npm start\n');
-}
-
-/* ------------------------------------------------------------------ */
-
-async function check(bin, args, label) {
+  console.log(`  … downloading model ${MODEL} (~1.5 GB, one time)`);
   try {
-    await run(bin, args);
-    console.log(`  ✔ ${label} found`);
-  } catch {
-    console.log(`  ✖ ${label} NOT found (${bin} is not on PATH)`);
-    failed = true;
-  }
-}
-
-async function fetchModel() {
-  const dest = modelPath(DEFAULT_MODEL);
-  if (fs.existsSync(dest) && fs.statSync(dest).size > 1_000_000) {
-    console.log(`  ✔ model ${DEFAULT_MODEL} already downloaded`);
-    return;
-  }
-  console.log(`  … downloading model ${DEFAULT_MODEL} (~1.5 GB, one time)`);
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  const tmp = `${dest}.part`;
-  try {
-    await download(MODEL_URL(DEFAULT_MODEL), tmp);
-    fs.renameSync(tmp, dest);
+    const { path: dest } = await models.fetch(MODEL, {
+      onProgress: ({ received, total }) => {
+        const pct = total ? `${((received / total) * 100).toFixed(1)}%` : '';
+        process.stdout.write(`\r    ${pct}  ${(received / 2 ** 30).toFixed(2)} GB`);
+      },
+    });
     console.log(`\n  ✔ model saved to ${dest}`);
   } catch (e) {
-    fs.rmSync(tmp, { force: true });
     console.log(`\n  ✖ model download failed: ${e.message}`);
-    console.log(`    Fetch it manually:\n    curl -L -o ${dest} \\\n      ${MODEL_URL(DEFAULT_MODEL)}`);
+    console.log(`    Fetch it manually:\n    curl -L --create-dirs -o ${models.pathFor(MODEL)} \\\n      ${models.urlFor(MODEL)}`);
     failed = true;
   }
 }
 
-function download(url, dest, redirects = 0) {
-  return new Promise((resolve, reject) => {
-    if (redirects > 5) return reject(new Error('too many redirects'));
-    https.get(url, { headers: { 'User-Agent': 'voicehistory-setup' } }, (res) => {
-      if ([301, 302, 303, 307, 308].includes(res.statusCode)) {
-        res.resume();
-        return download(res.headers.location, dest, redirects + 1).then(resolve, reject);
-      }
-      if (res.statusCode !== 200) {
-        res.resume();
-        return reject(new Error(`HTTP ${res.statusCode}`));
-      }
-      const total = Number(res.headers['content-length'] ?? 0);
-      let got = 0;
-      const out = fs.createWriteStream(dest);
-      res.on('data', (c) => {
-        got += c.length;
-        if (total) process.stdout.write(`\r    ${((got / total) * 100).toFixed(1)}%  ${(got / 2 ** 30).toFixed(2)} GB`);
-      });
-      res.pipe(out);
-      out.on('finish', () => out.close(resolve));
-      out.on('error', reject);
-      res.on('error', reject);
-    }).on('error', reject);
-  });
+if (failed) {
+  if (missing.length) console.log(`\nInstall the missing tools with:\n\n    ${probe.installCommand}\n`);
+  process.exitCode = 1;
+} else {
+  console.log('\nAll set. Start the app with:\n\n    npm run app\n');
 }

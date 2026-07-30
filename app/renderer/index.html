@@ -23,6 +23,7 @@
     <button id="btn-import" class="primary">Import</button>
     <button id="btn-jobs" class="ghost">Transcribe</button>
     <button id="btn-people" class="ghost">People</button>
+    <button id="btn-setup" class="ghost" hidden>Setup</button>
     <button id="btn-settings" class="ghost">Settings</button>
   </div>
 </header>
@@ -182,6 +183,30 @@
 
   <div class="dlg-actions">
     <button id="people-close" class="primary">Done</button>
+  </div>
+</dialog>
+
+<!-- What the app needs installed -->
+<dialog id="dlg-setup">
+  <h2>Requirements</h2>
+  <p class="muted tiny">Voice History does the archiving itself and hands the audio work to
+    two established tools rather than reimplementing them. The speech model it can fetch for you;
+    the tools are installed once, by you, so you know what is on your machine.</p>
+
+  <div id="setup-list" class="setup-list"></div>
+
+  <div id="setup-install" class="setup-install" hidden>
+    <span class="muted tiny">Install what is missing:</span>
+    <div class="vcf-row">
+      <code id="setup-cmd" class="grow"></code>
+      <button id="setup-copy" class="small">Copy</button>
+    </div>
+    <span class="muted tiny">Then press “Check again”. Nothing needs restarting.</span>
+  </div>
+
+  <div class="dlg-actions">
+    <button id="setup-recheck" class="ghost">Check again</button>
+    <button id="setup-close" class="primary">Close</button>
   </div>
 </dialog>
 

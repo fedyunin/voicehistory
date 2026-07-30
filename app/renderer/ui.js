@@ -30,6 +30,11 @@ async function boot() {
   await loadList(true);
   wire();
 
+  // Checked after the list is up, not before: a missing recognizer does not stop
+  // anyone from reading transcripts that already exist, so it must not stand in
+  // the way of opening the archive.
+  await loadSetup({ openIfIncomplete: true });
+
   // Deep link: #r=42 opens that recording directly, so a conversation can be
   // bookmarked and the selection survives a reload.
   const fromHash = Number(new URLSearchParams(location.hash.slice(1)).get('r'));
@@ -59,7 +64,8 @@ async function refreshStats() {
     banner('The archive is empty — bring in a phone export to get started.',
       { label: 'Import…', fn: openImport });
   } else if (!s.modelReady) {
-    banner(`Model ${s.model} is not downloaded, so nothing can be transcribed. Audio still imports and plays. Run: npm run setup`);
+    banner(`Model ${s.model} is not downloaded, so nothing can be transcribed. Audio still imports and plays.`,
+      { label: 'Set up…', fn: guard(async () => { await loadSetup(); $('dlg-setup').showModal(); }) });
   } else if (pending && !s.job.running) {
     // Import deliberately stops before transcription, which can run for days.
     // Saying nothing left imported recordings sitting in the queue with no hint
@@ -401,6 +407,15 @@ function wire() {
   }
 
   $('btn-jobs').onclick = guard(async () => { await refreshStats(); $('dlg-jobs').showModal(); });
+
+  $('btn-setup').onclick = guard(async () => { await loadSetup(); $('dlg-setup').showModal(); });
+  $('setup-close').onclick = () => $('dlg-setup').close();
+  $('setup-recheck').onclick = guard(() => loadSetup());
+  $('setup-copy').onclick = guard(async () => {
+    await navigator.clipboard.writeText(setup?.installCommand ?? '');
+    $('setup-copy').textContent = 'Copied';
+    setTimeout(() => { $('setup-copy').textContent = 'Copy'; }, 1500);
+  });
   $('jobs-cancel').onclick = () => $('dlg-jobs').close();
   $('jobs-go').onclick = guard(startTranscribe);
   $('jobs-all-again').onclick = guard(async () => {
@@ -847,6 +862,7 @@ async function startTranscribe() {
 
 const LABEL = {
   import: 'Importing', transcribe: 'Transcribing', reindex: 'Rebuilding index',
+  model: 'Downloading the speech model',
   backfill: 'Attaching metadata',
   'maintenance:reindex': 'Rebuilding index',
   'maintenance:names': 'Clearing contact names',
@@ -889,13 +905,19 @@ function onJob(j) {
   b.disabled = false;
   b.textContent = 'Stop';
   banner(j.error ? `Error: ${j.error}` : null);
+  // A finished download changes what the app can do, so re-probe rather than
+  // leaving the dialog claiming the model is still missing.
+  if (j.kind === 'model') loadSetup();
   refreshAll();
 }
 
 function showProgress({ kind, done = 0, total = 0, file, startedAt, stopping }) {
   $('progress').hidden = false;
   $('prog-label').textContent = stopping ? 'Stopping…' : (LABEL[kind] ?? kind);
-  $('prog-count').textContent = total ? `${done} of ${total}` : '';
+  // Counting bytes as if they were files would read as "412000000 of 1500000000".
+  $('prog-count').textContent = !total ? ''
+    : kind === 'model' ? `${fmtBytes(done)} of ${fmtBytes(total)}`
+    : `${done} of ${total}`;
   $('prog-fill').style.width = total ? `${(done / total) * 100}%` : '0';
   if (file) $('prog-file').textContent = file;
 
@@ -920,6 +942,74 @@ function showProgress({ kind, done = 0, total = 0, file, startedAt, stopping }) 
 async function refreshAll({ keepPlace = false } = {}) {
   await Promise.all([refreshStats(), loadSidebar()]);
   await loadList(!keepPlace, keepPlace);
+}
+
+/* ======================= requirements ======================= */
+
+let setup = null;
+
+/**
+ * Which external tools are present, and where. The interface has to be able to
+ * say this out loud: a packaged app launched from the Dock inherits none of the
+ * PATH a terminal has, so "ffmpeg is missing" can be true here and false in a
+ * shell, and a user with ffmpeg plainly installed deserves better than a flat
+ * contradiction.
+ */
+async function loadSetup({ openIfIncomplete = false } = {}) {
+  try {
+    setup = await api.setup();
+  } catch {
+    return;                                   // an older backend; nothing to show
+  }
+  $('btn-setup').hidden = setup.ready;
+  renderSetup();
+  if (openIfIncomplete && !setup.ready && !$('dlg-setup').open) $('dlg-setup').showModal();
+}
+
+function renderSetup() {
+  if (!setup) return;
+  const box = $('setup-list');
+  box.replaceChildren();
+
+  const rows = [
+    { ...setup.model, label: `Speech model — ${setup.model.name}`, isModel: true },
+    { ...setup['whisper-cli'], label: 'whisper-cli' },
+    { ...setup.ffmpeg, label: 'ffmpeg' },
+    { ...setup.ffprobe, label: 'ffprobe' },
+  ];
+
+  for (const item of rows) {
+    const row = el('div', `setup-row ${item.ok ? 'ok' : 'missing'}`);
+    row.append(el('span', 'mark', item.ok ? '✔' : '✖'));
+
+    const mid = el('div');
+    mid.append(el('div', 'name', item.label));
+    mid.append(el('div', 'muted tiny', item.why));
+    // Where it was found — or, for the model, where it would go. This line is
+    // the whole point of the dialog when PATH is what went wrong.
+    if (item.path && (item.ok || item.isModel)) mid.append(el('div', 'where', item.path));
+    row.append(mid);
+
+    // Only the model is ours to fetch; see core/models.js for why the binaries
+    // are left to the user.
+    if (item.isModel && !item.ok) {
+      const btn = el('button', 'primary small', item.size ? `Download · ${item.size}` : 'Download');
+      btn.onclick = guard(async () => {
+        btn.disabled = true;
+        const r = await api.setupModel();
+        if (r?.error) { banner(`Error: ${r.error}`); btn.disabled = false; }
+      });
+      row.append(btn);
+    } else if (item.isModel) {
+      row.append(el('span', 'muted tiny', fmtBytes(item.bytes)));
+    }
+
+    box.append(row);
+  }
+
+  const missing = rows.filter((r) => !r.ok && !r.isModel);
+  $('setup-install').hidden = missing.length === 0;
+  $('setup-cmd').textContent = setup.installCommand;
 }
 
 /* ======================= formatting ======================= */
