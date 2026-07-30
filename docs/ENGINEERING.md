@@ -273,6 +273,13 @@ of YAML. Each runner uploads its artifacts and a single final job collects them
 into one draft release; publishing from each runner instead would have three jobs
 racing to create the same release.
 
+Artifact names carry no version — `VoiceHistory-mac-arm64.dmg`, not
+`VoiceHistory-0.1.0-mac-arm64.dmg`. That is what makes the README's download
+links work: `releases/latest/download/<name>` resolves against the newest
+published release, so the links never need editing, but only while the filename
+stays identical between releases. Putting the version back into `artifactName`
+would silently 404 every download link in the README.
+
 Targets and their architectures live in `package.json`, not in the `dist:*`
 scripts. Naming them on the command line (`electron-builder --mac dmg zip`)
 overrides the configured architecture list and quietly builds for the host

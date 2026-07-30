@@ -1,6 +1,7 @@
 # Voice History
 
 [![test](https://github.com/fedyunin/voicehistory/actions/workflows/test.yml/badge.svg)](https://github.com/fedyunin/voicehistory/actions/workflows/test.yml)
+[![latest release](https://img.shields.io/github/v/release/fedyunin/voicehistory)](https://github.com/fedyunin/voicehistory/releases/latest)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A local-first archive for recorded phone calls. Point it at a folder of
@@ -50,9 +51,19 @@ Requires Node 20+, [ffmpeg](https://ffmpeg.org/) and
 
 ### Or download a build
 
-Tagged releases carry installers for macOS, Windows and Linux, built on
-[GitHub Actions](.github/workflows/release.yml):
-**[Releases](https://github.com/fedyunin/voicehistory/releases)**.
+| | |
+|---|---|
+| **macOS** — Apple Silicon | [VoiceHistory-mac-arm64.dmg](https://github.com/fedyunin/voicehistory/releases/latest/download/VoiceHistory-mac-arm64.dmg) |
+| **macOS** — Intel | [VoiceHistory-mac-x64.dmg](https://github.com/fedyunin/voicehistory/releases/latest/download/VoiceHistory-mac-x64.dmg) |
+| **Windows** — installer | [VoiceHistory-win-x64-setup.exe](https://github.com/fedyunin/voicehistory/releases/latest/download/VoiceHistory-win-x64-setup.exe) |
+| **Windows** — portable | [VoiceHistory-win-x64-portable.exe](https://github.com/fedyunin/voicehistory/releases/latest/download/VoiceHistory-win-x64-portable.exe) |
+| **Linux** — Debian/Ubuntu | [VoiceHistory-linux-amd64.deb](https://github.com/fedyunin/voicehistory/releases/latest/download/VoiceHistory-linux-amd64.deb) |
+| **Linux** — AppImage | [VoiceHistory-linux-x86_64.AppImage](https://github.com/fedyunin/voicehistory/releases/latest/download/VoiceHistory-linux-x86_64.AppImage) |
+
+Those links always resolve to the newest release — every version is built on
+[GitHub Actions](.github/workflows/release.yml) with the same filenames, so
+nothing here has to be edited when one ships. All builds, including the macOS
+zips, are on the [releases page](https://github.com/fedyunin/voicehistory/releases).
 
 They are unsigned, so the first launch needs a nudge past the OS: on macOS
 right-click → Open, on Windows *More info* → *Run anyway*. They also still
