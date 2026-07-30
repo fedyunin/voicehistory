@@ -285,11 +285,40 @@ scripts. Naming them on the command line (`electron-builder --mac dmg zip`)
 overrides the configured architecture list and quietly builds for the host
 architecture only — the first build produced arm64 alone and looked correct.
 
-`CSC_IDENTITY_AUTO_DISCOVERY: 'false'` and `mac.identity: null` are both needed:
-without them electron-builder searches for a signing identity, finds none, and
-fails the build rather than producing an unsigned artifact. Signing needs a paid
-Apple Developer ID and a Windows certificate, so builds are unsigned for now and
-the README says how to get past the OS warning.
+`mac.identity` must be `"-"`, not `null`, and this one cost a released build.
+
+`null` skips signing altogether. The packaged app then keeps the ad-hoc
+signature the linker left on the Electron binary — `Identifier=Electron`,
+`adhoc, linker-signed` — which no longer describes the bundle it now sits in.
+`codesign --verify` says so plainly:
+
+```
+code has no resources but signature indicates they must be present
+```
+
+macOS reports that as **“Voice History.app” is damaged and can’t be opened. You
+should move it to the Trash** — which reads like a corrupted download rather than
+a signing problem, and offers no way past it. `"-"` makes electron-builder
+ad-hoc sign the bundle for real: `Identifier=ru.cranfan.voicehistory`,
+`adhoc, runtime`, and `codesign --verify --deep --strict` passes.
+
+Gatekeeper still rejects it, because ad-hoc is not notarization — but that
+rejection is the ordinary "Apple cannot check it for malicious software" dialog,
+which right-click → Open gets past. A broken signature has no such escape.
+
+Worth knowing that electron-builder warns about ad-hoc signing needing
+`com.apple.security.cs.disable-library-validation` under hardened runtime: it
+already adds that entitlement itself, along with `allow-jit` and
+`allow-unsigned-executable-memory`. Without it the native SQLite module would be
+refused at load time. Verified by launching a copy taken from the dmg with
+`com.apple.quarantine` set, which is the state a downloaded app is actually in.
+
+`CSC_IDENTITY_AUTO_DISCOVERY: 'false'` stays in CI alongside it, so a build
+machine that happens to hold a real certificate cannot quietly produce a
+differently-signed artifact. Verified in that combination rather than assumed.
+
+Real signing needs a paid Apple Developer ID and a Windows certificate; until
+then the README says exactly what the OS will say and what to do about it.
 
 `ffmpeg` and `whisper-cli` stay external. Bundling them means shipping platform
 binaries plus a ~1.5 GB model, taking on ffmpeg's licensing, and maintaining

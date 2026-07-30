@@ -65,11 +65,16 @@ Those links always resolve to the newest release — every version is built on
 nothing here has to be edited when one ships. All builds, including the macOS
 zips, are on the [releases page](https://github.com/fedyunin/voicehistory/releases).
 
-They are unsigned, so the first launch needs a nudge past the OS: on macOS
-right-click → Open, on Windows *More info* → *Run anyway*. They also still
-expect `ffmpeg` and `whisper-cli` on your `PATH` — the recognizer and its model
-are hundreds of megabytes each and are deliberately not bundled. Running from
-source is the better-supported path today.
+The builds are ad-hoc signed but not notarized — that needs a paid Apple
+Developer ID — so the first launch needs a nudge past the OS:
+
+- **macOS** — right-click the app → **Open**, then confirm. Or, if macOS still
+  refuses: `xattr -cr "/Applications/Voice History.app"`.
+- **Windows** — *More info* → *Run anyway*.
+
+They also still expect `ffmpeg` and `whisper-cli` on your `PATH` — the
+recognizer and its model are hundreds of megabytes each and are deliberately not
+bundled. Running from source is the better-supported path today.
 
 ## Using it
 
