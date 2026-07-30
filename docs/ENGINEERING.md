@@ -238,11 +238,53 @@ format version, so the folder can be moved to another disk or machine — or ope
 by a later version of the app — and still work. That is the point of keeping the
 archive entirely separate from the checkout.
 
-The UI talks to the backend through exactly one file,
-`app/renderer/api.js`. Wrapping this in Electron means reimplementing that single
-module over IPC — `cli/server.js` becomes `main.js`, method names stay identical,
-and `ui.js` is never opened. There is no build step and no framework, on purpose.
+The UI talks to the backend through exactly one file, `app/renderer/api.js`, and
+that seam is what made the desktop shell cheap. It picks its transport at load
+time: `fetch` when served over HTTP, `contextBridge` IPC when `window.vh` exists.
+Method names are identical on both sides, so `ui.js` — the largest file in the
+project — was never opened while Electron was added. `cli/server.js` and
+`app/main.cjs` are two adapters over the same core, not two implementations.
+
+Two things about the main process are not obvious:
+
+- It is CommonJS while everything else is ESM. An ESM entry point does not
+  reliably receive Electron's real bindings, and the failure looks like `app`
+  being undefined. The core is loaded from it by dynamic `import()`.
+- `npm run app` goes through `scripts/app.mjs`, which deletes
+  `ELECTRON_RUN_AS_NODE` before spawning. VS Code exports that variable into its
+  integrated terminals, and it makes Electron start as a bare Node process — the
+  same undefined-`app` symptom, from an entirely different cause.
+
+Serving audio needed `protocol.registerSchemesAsPrivileged` with `stream: true`,
+and then range requests implemented by hand: without `Accept-Ranges` and
+`Content-Length` the browser reports the media as unseekable, which on a
+27-minute call is the whole feature.
 
 If this were ever packaged commercially, ffmpeg would need replacing:
 opencore-amr (Apache-2.0) to decode plus libopus (BSD) to encode, avoiding
 ffmpeg's GPL/LGPL obligations entirely.
+
+## Packaging
+
+Installers are built by electron-builder, one runner per platform, because
+better-sqlite3 is native and gets recompiled against Electron's ABI for each
+target — cross-building it is not worth the trouble when a matrix is three lines
+of YAML. Each runner uploads its artifacts and a single final job collects them
+into one draft release; publishing from each runner instead would have three jobs
+racing to create the same release.
+
+Targets and their architectures live in `package.json`, not in the `dist:*`
+scripts. Naming them on the command line (`electron-builder --mac dmg zip`)
+overrides the configured architecture list and quietly builds for the host
+architecture only — the first build produced arm64 alone and looked correct.
+
+`CSC_IDENTITY_AUTO_DISCOVERY: 'false'` and `mac.identity: null` are both needed:
+without them electron-builder searches for a signing identity, finds none, and
+fails the build rather than producing an unsigned artifact. Signing needs a paid
+Apple Developer ID and a Windows certificate, so builds are unsigned for now and
+the README says how to get past the OS warning.
+
+`ffmpeg` and `whisper-cli` stay external. Bundling them means shipping platform
+binaries plus a ~1.5 GB model, taking on ffmpeg's licensing, and maintaining
+three build recipes — a different project from this one. The installers are
+therefore a convenience; running from source is the supported path.

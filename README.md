@@ -1,5 +1,8 @@
 # Voice History
 
+[![test](https://github.com/fedyunin/voicehistory/actions/workflows/test.yml/badge.svg)](https://github.com/fedyunin/voicehistory/actions/workflows/test.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A local-first archive for recorded phone calls. Point it at a folder of
 call-recorder exports and it files them by date, transcribes the speech, and
 turns years of conversations into something you can search and listen back to.
@@ -28,8 +31,13 @@ cd voicehistory
 
 npm install
 npm run setup      # checks ffmpeg + whisper.cpp, downloads the model (~1.5 GB)
-npm start          # → http://127.0.0.1:4321
+
+npm run app        # desktop window
+npm start          # or in a browser → http://127.0.0.1:4321
 ```
+
+Both open the same archive and the same interface; the desktop window adds a
+native folder picker and keeps running without a terminal.
 
 On first run the interface asks where to keep your archive. Nothing else needs
 configuring.
@@ -37,6 +45,18 @@ configuring.
 Requires Node 20+, [ffmpeg](https://ffmpeg.org/) and
 [whisper.cpp](https://github.com/ggml-org/whisper.cpp). On macOS:
 `brew install ffmpeg whisper-cpp`. Run `npm run doctor` to see what is missing.
+
+### Or download a build
+
+Tagged releases carry installers for macOS, Windows and Linux, built on
+[GitHub Actions](.github/workflows/release.yml):
+**[Releases](https://github.com/fedyunin/voicehistory/releases)**.
+
+They are unsigned, so the first launch needs a nudge past the OS: on macOS
+right-click → Open, on Windows *More info* → *Run anyway*. They also still
+expect `ffmpeg` and `whisper-cli` on your `PATH` — the recognizer and its model
+are hundreds of megabytes each and are deliberately not bundled. Running from
+source is the better-supported path today.
 
 ## Using it
 
@@ -152,8 +172,10 @@ environment or a default.
 ## Commands
 
 ```bash
+npm run app        open the archive in a desktop window
 npm start          open the archive in a browser
 npm run setup      verify tools, fetch the model
+npm test           run the test suite
 npm run doctor     environment check
 npm run status     summary: years, people, hours
 npm run watch      follow a job running elsewhere
@@ -166,6 +188,24 @@ node cli/vh.js archive /path/to/dir  open or create an archive there
 
 The CLI has a little more: `node cli/vh.js` prints everything, including
 importing without moving the sources and transcribing a limited batch.
+
+## Building installers
+
+```bash
+npm run dist        # for the machine you are on
+npm run dist:mac    # dmg + zip, x64 and arm64
+npm run dist:win    # nsis installer + portable exe
+npm run dist:linux  # AppImage + deb
+```
+
+Output lands in `dist/`. Each platform has to be built on itself — the native
+SQLite module is compiled against Electron's ABI for the target — which is why
+CI runs three runners in parallel and collects the artifacts into one draft
+release. Tag to publish:
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
 
 ## Notes on the hard parts
 

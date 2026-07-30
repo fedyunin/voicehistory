@@ -13,7 +13,12 @@
     "doctor": "node cli/vh.js doctor",
     "jobs": "node cli/vh.js jobs",
     "watch": "node cli/vh.js watch",
-    "app": "node scripts/app.mjs"
+    "app": "node scripts/app.mjs",
+    "test": "node --test",
+    "dist": "electron-builder --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:win": "electron-builder --win --publish never",
+    "dist:linux": "electron-builder --linux --publish never"
   },
   "keywords": [
     "whisper",
@@ -46,7 +51,87 @@
   },
   "homepage": "https://github.com/fedyunin/voicehistory#readme",
   "devDependencies": {
-    "electron": "^43.2.0"
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3"
   },
-  "main": "app/main.cjs"
+  "main": "app/main.cjs",
+  "build": {
+    "appId": "ru.cranfan.voicehistory",
+    "productName": "Voice History",
+    "artifactName": "VoiceHistory-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "app/**/*",
+      "core/**/*",
+      "cli/**/*",
+      "scripts/setup.mjs",
+      "package.json",
+      "!**/*.map"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "identity": null,
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ]
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "artifactName": "VoiceHistory-${os}-${arch}-setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "VoiceHistory-${os}-${arch}-portable.${ext}"
+    },
+    "linux": {
+      "category": "AudioVideo",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    }
+  }
 }

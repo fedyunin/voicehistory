@@ -1,0 +1,93 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      # One platform failing should not hide whether the others built.
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            script: dist:mac
+          - os: windows-latest
+            script: dist:win
+          - os: ubuntu-latest
+            script: dist:linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # Electron's own binaries are ~100 MB per platform and unchanged between
+      # runs; caching them is the difference between a two-minute and a
+      # six-minute build.
+      - uses: actions/cache@v4
+        with:
+          # Linux/macOS use the first pair, Windows the second; a path that does
+          # not exist on the runner is simply skipped.
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+          key: ${{ runner.os }}-electron-${{ hashFiles('package-lock.json') }}
+          restore-keys: ${{ runner.os }}-electron-
+
+      - run: npm ci
+
+      # Never ship an installer built from code that does not pass its own tests.
+      - run: npm test
+
+      - name: Build installers
+        run: npm run ${{ matrix.script }}
+        env:
+          # No code-signing certificates yet. Without this, electron-builder looks
+          # for an identity, finds none, and fails the build instead of producing
+          # an unsigned artifact.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.os }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            dist/*.dmg
+            dist/*mac*.zip
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.exe
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # Collect every platform first, then publish once. Publishing from each
+      # runner instead would race three jobs against the same release.
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: |
+            artifacts/*.dmg
+            artifacts/*mac*.zip
+            artifacts/*.AppImage
+            artifacts/*.deb
+            artifacts/*.exe

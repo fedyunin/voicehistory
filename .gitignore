@@ -9,3 +9,6 @@
 node_modules/
 *.log
 .DS_Store
+
+# Installer output from electron-builder.
+/dist/
