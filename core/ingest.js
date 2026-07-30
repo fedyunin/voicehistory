@@ -412,6 +412,13 @@ const tally = (r) => r.imported + r.duplicates + r.failed;
  */
 function isTeardown(e) {
   const m = String(e?.message ?? '');
+  // A missing file under the archive's scratch directory is the same story wearing
+  // a different hat: the recognizer was killed after starting but before writing
+  // its result, so the output json we then went to read was never created. Seen in
+  // the wild as a lone 'failed' among 5361 recordings after the app was closed
+  // mid-run. Scoped to .tmp/ on purpose — ENOENT elsewhere, such as a missing
+  // model, is a real problem worth reporting.
+  if (/ENOENT/.test(m) && /[/\\]\.tmp[/\\]/.test(m)) return true;
   return /database connection is not open|SQLITE_MISUSE|SIGTERM|SIGKILL|killed/i.test(m);
 }
 
