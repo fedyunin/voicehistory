@@ -1,5 +1,10 @@
 /* A calm palette: this is an archive to read and listen to, not a monitoring dashboard. */
 :root {
+  /* Tells the browser to theme what CSS cannot reach: scrollbars and the audio
+     player's built-in controls. Without it those stayed light in dark mode —
+     a bright scrollbar between two dark panels, and a white player. */
+  color-scheme: light dark;
+
   --bg: #fbfaf8;
   --panel: #ffffff;
   --line: #e6e2db;
