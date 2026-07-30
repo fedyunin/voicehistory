@@ -302,3 +302,16 @@ dialog.wide-dlg { max-width: 660px; }
 
 .player .redo { margin-top: 8px; }
 .dlg-actions #jobs-all-again { margin-right: 0; }
+
+/* ---------- active filters ---------- */
+.filters {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 7px;
+  padding: 10px 16px 2px;
+}
+.filter-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 2px 8px; font-size: 12.5px; border-radius: 20px;
+  border: 1px solid var(--accent); background: var(--accent-soft); color: var(--ink);
+}
+.filter-chip .x { color: var(--muted); font-size: 14px; line-height: 1; }
+.filter-chip:hover .x { color: var(--accent); }

@@ -10,7 +10,7 @@ const el = (tag, cls, html) => {
   return n;
 };
 
-const state = { q: '', stems: [], contactId: null, year: null, offset: 0, total: 0,
+const state = { q: '', stems: [], contactId: null, contactName: null, year: null, offset: 0, total: 0,
                 currentId: null, segments: [], hits: [], hitAt: 0 };
 
 /* ======================= boot ======================= */
@@ -82,7 +82,7 @@ async function loadSidebar() {
   for (const y of ys) {
     const li = el('li', state.year === y.year ? 'on' : '');
     li.append(el('span', 'name', y.year), el('span', 'n', y.calls));
-    li.onclick = () => { state.year = state.year === y.year ? null : y.year; state.contactId = null; refilter(); };
+    li.onclick = () => { state.year = state.year === y.year ? null : y.year; refilter(); };
     yl.append(li);
   }
 
@@ -92,15 +92,64 @@ async function loadSidebar() {
     const li = el('li', state.contactId === c.id ? 'on' : '');
     li.title = `${c.display_name} — ${c.calls} calls, ${fmtDur(c.total_ms)}`;
     li.append(el('span', 'name', c.display_name), el('span', 'n', c.calls));
-    li.onclick = () => { state.contactId = state.contactId === c.id ? null : c.id; state.year = null; refilter(); };
+    li.onclick = () => { state.contactId = state.contactId === c.id ? null : c.id; state.contactName = state.contactId ? c.display_name : null; refilter(); };
     cl.append(li);
   }
 }
 
 function refilter() {
   state.offset = 0;
+  renderFilters();
   loadSidebar();
   loadList(true);
+}
+
+/**
+ * What is currently narrowing the list, and how to undo it.
+ *
+ * Filters could always be cleared by clicking the same row again, but nothing
+ * said so — an invisible toggle is not an affordance. Showing the active filter
+ * with a way out covers both of the heuristics at stake: the system says what
+ * state it is in, and offers an exit that does not require guessing.
+ *
+ * A single "All" row per list would have been the other option, and is weaker: it
+ * duplicates state in two places and says nothing once a year and a person are
+ * applied together.
+ */
+function renderFilters() {
+  const box = $('filters');
+  box.replaceChildren();
+
+  const active = [];
+  if (state.year) active.push({ label: state.year, clear: () => { state.year = null; } });
+  if (state.contactId) {
+    active.push({
+      label: state.contactName ?? 'selected person',
+      clear: () => { state.contactId = null; state.contactName = null; },
+    });
+  }
+  if (state.q) active.push({ label: `“${state.q}”`, clear: () => { $('q').value = ''; state.q = ''; } });
+
+  box.hidden = active.length === 0;
+  if (!active.length) return;
+
+  box.append(el('span', 'muted tiny', 'Showing only'));
+  for (const f of active) {
+    const chip = el('button', 'filter-chip');
+    chip.append(el('span', '', esc(String(f.label))), el('span', 'x', '×'));
+    chip.title = 'Remove this filter';
+    chip.onclick = () => { f.clear(); refilter(); };
+    box.append(chip);
+  }
+  if (active.length > 1) {
+    const all = el('button', 'small ghost', 'Show all');
+    all.onclick = () => {
+      state.year = null; state.contactId = null; state.contactName = null;
+      $('q').value = ''; state.q = '';
+      refilter();
+    };
+    box.append(all);
+  }
 }
 
 const PAGE = 60;
@@ -332,9 +381,9 @@ function wire() {
   $('q').oninput = (e) => {
     clearTimeout(t);
     const v = e.target.value.trim();
-    t = setTimeout(() => { state.q = v; loadList(true); }, 220);
+    t = setTimeout(() => { state.q = v; renderFilters(); loadList(true); }, 220);
   };
-  $('clear').onclick = () => { $('q').value = ''; state.q = ''; loadList(true); };
+  $('clear').onclick = () => { $('q').value = ''; state.q = ''; renderFilters(); loadList(true); };
   $('more').onclick = () => { state.offset += PAGE; loadList(false); };
 
   $('btn-import').onclick = guard(openImport);
