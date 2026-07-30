@@ -52,7 +52,14 @@ test('the search does not depend on PATH alone', () => {
   process.env.PATH = '';
   try {
     tools.reload();
-    assert.equal(tools.find('sh'), '/bin/sh');
+    const sh = tools.find('sh');
+    // Not asserted as a literal path: on a usrmerge distribution this resolves
+    // to /usr/bin/sh rather than /bin/sh, and which one is found first is not
+    // what this test is about.
+    assert.ok(sh, 'sh must be found with PATH empty');
+    assert.ok(path.isAbsolute(sh), `expected an absolute path, got ${sh}`);
+    assert.equal(path.basename(sh), 'sh');
+    assert.ok(fs.existsSync(sh));
   } finally {
     process.env.PATH = before;
     tools.reload();
