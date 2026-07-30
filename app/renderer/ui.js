@@ -103,17 +103,35 @@ function refilter() {
   loadList(true);
 }
 
-async function loadList(reset) {
+const PAGE = 60;
+
+/**
+ * @param {boolean} reset  start again from the first page
+ * @param {boolean} keepPlace  refetch everything already loaded and restore the
+ *   scroll position. Used by the periodic refresh during a long job: reloading
+ *   from page one there threw away every "Load more" and snapped the list back to
+ *   the top every few seconds, which is unusable while a 42-hour run is going.
+ */
+async function loadList(reset, keepPlace = false) {
   if (reset) state.offset = 0;
+  const pane = document.querySelector('.middle');
+  const loaded = $('calls').children.length;
+  const scrollTop = pane?.scrollTop ?? 0;
+
   const r = await api.list({
-    q: state.q, contact: state.contactId, year: state.year, offset: state.offset, limit: 60,
+    q: state.q,
+    contact: state.contactId,
+    year: state.year,
+    offset: keepPlace ? 0 : state.offset,
+    limit: keepPlace ? Math.max(PAGE, loaded) : PAGE,
   });
   state.total = r.total;
   state.stems = r.stems ?? [];
 
   const ul = $('calls');
-  if (reset) ul.replaceChildren();
+  if (reset || keepPlace) ul.replaceChildren();
   for (const row of r.rows) ul.append(callRow(row));
+  if (keepPlace && pane) pane.scrollTop = scrollTop;
 
   const shown = ul.children.length;
   $('list-head').textContent = state.q
@@ -317,7 +335,7 @@ function wire() {
     t = setTimeout(() => { state.q = v; loadList(true); }, 220);
   };
   $('clear').onclick = () => { $('q').value = ''; state.q = ''; loadList(true); };
-  $('more').onclick = () => { state.offset += 60; loadList(false); };
+  $('more').onclick = () => { state.offset += PAGE; loadList(false); };
 
   $('btn-import').onclick = guard(openImport);
   $('imp-cancel').onclick = () => $('dlg-import').close();
@@ -803,13 +821,15 @@ function showProgress({ kind, done = 0, total = 0, file }) {
 
   // Refresh the list during long jobs, but not on every single event.
   if (!refreshTimer) {
-    refreshTimer = setTimeout(() => { refreshTimer = null; refreshAll(); }, 4000);
+    // Longer than it was, and non-destructive: a job that runs for days should not
+    // redraw the list under the reader's hands.
+    refreshTimer = setTimeout(() => { refreshTimer = null; refreshAll({ keepPlace: true }); }, 8000);
   }
 }
 
-async function refreshAll() {
+async function refreshAll({ keepPlace = false } = {}) {
   await Promise.all([refreshStats(), loadSidebar()]);
-  await loadList(true);
+  await loadList(!keepPlace, keepPlace);
 }
 
 /* ======================= formatting ======================= */
