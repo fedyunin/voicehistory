@@ -45,8 +45,8 @@ test('a tool absent everywhere resolves to null, and bin() still yields a spawna
 
 test('the search does not depend on PATH alone', () => {
   // The point of the module: with PATH emptied, anything installed in a standard
-  // location must still be found. /bin/sh stands in for such a location because
-  // it exists on every POSIX runner.
+  // location must still be found. `sh` stands in for such a tool because every
+  // POSIX runner has one, wherever that distribution keeps it.
   if (process.platform === 'win32') return;
   const before = process.env.PATH;
   process.env.PATH = '';
