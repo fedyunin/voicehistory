@@ -77,3 +77,27 @@ test('fetching a model that is already there does nothing', async () => {
     assert.equal(r.skipped, true, 'no network call for a model already on disk');
   });
 });
+
+test('an unwritable candidate is skipped rather than returned', () => {
+  // This is the packaged-app case in miniature. There, the first candidate is
+  // inside app.asar — a read-only archive — and returning it would leave the
+  // in-app download writing to a path that cannot accept it. Any unwritable
+  // directory exercises the same branch.
+  if (process.platform === 'win32') return;      // chmod does not deny writes here
+  if (process.getuid?.() === 0) return;          // root ignores the mode bits
+
+  const locked = fs.mkdtempSync(path.join(os.tmpdir(), 'vh-locked-'));
+  fs.chmodSync(locked, 0o500);                   // readable, not writable
+  const before = process.env.VH_MODELS_DIR;
+  process.env.VH_MODELS_DIR = locked;
+  try {
+    assert.notEqual(modelsWriteDir(), locked,
+      'a directory that cannot be written to must never be chosen for a download');
+    assert.equal(modelDirs()[0], locked, 'though it is still searched for an existing model');
+  } finally {
+    if (before === undefined) delete process.env.VH_MODELS_DIR;
+    else process.env.VH_MODELS_DIR = before;
+    fs.chmodSync(locked, 0o700);
+    fs.rmSync(locked, { recursive: true, force: true });
+  }
+});
