@@ -182,16 +182,29 @@ const API = {
   'backfill/props': ({ dir }) => runner.start('backfill', () => backfillProps(dir || paths.inbox)),
 
   /* --- jobs --- */
-  'transcribe/start': ({ order, limit }) => runner.start('transcribe', () => transcribePending({
-    order: order === 'newest' ? 'newest' : 'named',
-    limit: limit ? Number(limit) : Infinity,
-    shouldStop: runner.isCancelled,
-  })),
+  'transcribe/start': ({ order, limit }) => {
+    // Refuse rather than start a job that can only fail on every file: a job whose
+    // every recording failed used to finish looking like success, so the interface
+    // said nothing at all.
+    if (!models.available()) {
+      return { error: `Model ${config.MODEL} is not downloaded — open Setup to fetch it`, needsModel: true };
+    }
+    return runner.start('transcribe', () => transcribePending({
+      order: order === 'newest' ? 'newest' : 'named',
+      limit: limit ? Number(limit) : Infinity,
+      shouldStop: runner.isCancelled,
+    }));
+  },
   /** Redo one recording, or the whole archive when no id is given. */
-  'transcribe/again': ({ id }) => runner.start('transcribe', () => retranscribe({
-    ids: id ? [Number(id)] : null,
-    shouldStop: runner.isCancelled,
-  })),
+  'transcribe/again': ({ id }) => {
+    if (!models.available()) {
+      return { error: `Model ${config.MODEL} is not downloaded — open Setup to fetch it`, needsModel: true };
+    }
+    return runner.start('transcribe', () => retranscribe({
+      ids: id ? [Number(id)] : null,
+      shouldStop: runner.isCancelled,
+    }));
+  },
   reindex: () => runner.start('reindex', () => reindex()),
   cancel: () => { runner.cancel(); return { ok: true }; },
 

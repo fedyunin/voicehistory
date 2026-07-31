@@ -297,13 +297,17 @@ async function runTranscribe({
   const total = Math.min(pendingTotal, limit);
   const jobId = db.startJob('transcribe', total, nowIso());
   let done = 0, failed = 0;
+  // Kept so the caller can say WHY nothing worked. A job where every recording
+  // failed used to finish looking exactly like success: the interface cleared its
+  // banner and said nothing at all.
+  let lastError = null;
 
   progress({ phase: 'transcribe', done: 0, total });
 
   while (done + failed < total) {
     if (shouldStop()) {
       db.finishJob(jobId, 'cancelled', nowIso(), JSON.stringify({ done, failed }));
-      return { done, failed, total, cancelled: true };
+      return { done, failed, total, cancelled: true, lastError };
     }
     const [rec] = db.nextPending(1, order, onlyIds);
     if (!rec) break;
@@ -387,13 +391,14 @@ async function runTranscribe({
       // quitting while one runs, used to leave recordings marked 'failed' with a
       // teardown message attached — indistinguishable from audio that genuinely
       // cannot be transcribed, and never retried.
-      if (shouldStop() || isTeardown(e)) {
+      if (shouldStop() || isTeardown(e, shouldStop())) {
         db.markStatus(rec.id, 'pending');
         db.finishJob(jobId, 'cancelled', nowIso(), JSON.stringify({ done, failed }));
-        return { done, failed, total, cancelled: true };
+        return { done, failed, total, cancelled: true, lastError: lastError ?? e.message };
       }
       db.markStatus(rec.id, 'failed', e.message);
       failed++;
+      lastError = e.message;
       db.bumpJob(jobId, { failed: 1 });
       logLine(`transcription failed for ${rec.orig_name}: ${e.message}`);
     } finally {
@@ -404,8 +409,8 @@ async function runTranscribe({
     progress({ phase: 'transcribe', done: done + failed, total, file: rec.orig_name });
   }
 
-  db.finishJob(jobId, 'done', nowIso(), JSON.stringify({ done, failed }));
-  return { done, failed, total };
+  db.finishJob(jobId, failed && !done ? 'failed' : 'done', nowIso(), JSON.stringify({ done, failed, lastError }));
+  return { done, failed, total, lastError };
 }
 
 /* ============================ helpers ============================ */
@@ -417,15 +422,17 @@ const tally = (r) => r.imported + r.duplicates + r.failed;
  * the database closing under an in-flight job, or the recognizer being killed
  * with its parent.
  */
-function isTeardown(e) {
+function isTeardown(e, stopped = false) {
   const m = String(e?.message ?? '');
-  // A missing file under the archive's scratch directory is the same story wearing
-  // a different hat: the recognizer was killed after starting but before writing
-  // its result, so the output json we then went to read was never created. Seen in
-  // the wild as a lone 'failed' among 5361 recordings after the app was closed
-  // mid-run. Scoped to .tmp/ on purpose — ENOENT elsewhere, such as a missing
-  // model, is a real problem worth reporting.
-  if (/ENOENT/.test(m) && /[/\\]\.tmp[/\\]/.test(m)) return true;
+  // A missing file under the archive's scratch directory usually means the
+  // recognizer was killed after starting but before writing its result, so the
+  // json we then went to read was never created. Seen in the wild as a lone
+  // 'failed' among 5361 recordings after the app was closed mid-run.
+  //
+  // But only when a stop was actually asked for. Applied unconditionally this
+  // swallowed a real failure — the recognizer running and producing nothing — into
+  // a job that reported itself cancelled, with nothing said and nothing to read.
+  if (stopped && /ENOENT/.test(m) && /[/\\]\.tmp[/\\]/.test(m)) return true;
   if (abort.isAbortError(e) || /aborted|ABORT_ERR/i.test(m)) return true;
   return /database connection is not open|SQLITE_MISUSE|SIGTERM|SIGKILL|killed/i.test(m);
 }

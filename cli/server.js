@@ -231,6 +231,12 @@ async function api(req, res, url) {
     }
 
     case 'transcribe/start': {
+    // Refuse rather than start a job that can only fail on every file. Without
+    // this the queue drained into per-recording failures and the interface said
+    // nothing, because a job whose every file failed still finished "successfully".
+    if (!models.available()) {
+      return json(res, 409, { error: `Model ${config.MODEL} is not downloaded — open Setup to fetch it`, needsModel: true });
+    }
       const body = await readJson(req);
       return json(res, 200, runner.start('transcribe', () => transcribePending({
         order: body.order === 'newest' ? 'newest' : 'named',
@@ -240,6 +246,9 @@ async function api(req, res, url) {
     }
 
     case 'transcribe/again': {
+      if (!models.available()) {
+        return json(res, 409, { error: `Model ${config.MODEL} is not downloaded — open Setup to fetch it`, needsModel: true });
+      }
       const { id } = await readJson(req);
       return json(res, 200, runner.start('transcribe', () => retranscribe({
         ids: id ? [Number(id)] : null, shouldStop: runner.isCancelled,

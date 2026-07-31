@@ -310,6 +310,32 @@ means distributing someone else's software under GPL/LGPL obligations, from
 sources that differ per platform, with checksums to verify. That is an installer,
 not a feature.
 
+## A job that fails on everything is not a success
+
+Pressing Transcribe in an installed build appeared to start and then stop: no
+progress, no error, no notification. The recognizer could not find its model —
+`bin/models` is not visible to a packaged app — so every recording failed, and
+the job still finished normally, because `runTranscribe` returns counts rather
+than throwing. `runner` then emitted completion with no error, and the interface
+cleared its banner. Every layer behaved as written; nobody said anything.
+
+Three changes, in the order they matter:
+
+- Transcription **refuses to start** when the model is absent, rather than
+  draining the queue into per-file failures. A job that cannot succeed on any
+  file should never begin.
+- The job result carries `lastError`, and finishing with `failed > 0 && done === 0`
+  is recorded as `failed`, not `done`. The interface has three outcomes now, not
+  two, and names the reason.
+- `isTeardown` no longer treats a missing file under `.tmp/` as teardown
+  unconditionally — only when a stop was actually requested. Applied to any such
+  error it would swallow a real failure (the recognizer running and producing no
+  output) into a job that reported itself cancelled.
+
+The lesson is narrower than "handle errors": every one of these paths *did* handle
+its error. What was missing was any single place responsible for telling the user
+that the thing they pressed did not happen.
+
 ## Packaging
 
 Installers are built by electron-builder, one runner per platform, because

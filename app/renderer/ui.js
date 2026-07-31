@@ -855,7 +855,21 @@ async function startImport() {
 async function startTranscribe() {
   const order = document.querySelector('input[name=order]:checked').value;
   $('dlg-jobs').close();
-  try { await api.transcribeStart({ order }); } catch (e) { banner(e.message); }
+  try {
+    // The IPC transport answers with an object, HTTP throws on 409 — a refusal
+    // has to surface either way, or pressing Transcribe does nothing visible.
+    const r = await api.transcribeStart({ order });
+    if (r?.error) offerSetup(r.error, r.needsModel);
+  } catch (e) {
+    offerSetup(e.message, /not downloaded/i.test(e.message));
+  }
+}
+
+/** States the problem and, when it is a missing model, opens the way to fix it. */
+function offerSetup(message, needsModel) {
+  banner(message, needsModel
+    ? { label: 'Set up…', fn: guard(async () => { await loadSetup(); $('dlg-setup').showModal(); }) }
+    : undefined);
 }
 
 /* ======================= progress ======================= */
@@ -904,7 +918,21 @@ function onJob(j) {
   const b = $('prog-cancel');
   b.disabled = false;
   b.textContent = 'Stop';
-  banner(j.error ? `Error: ${j.error}` : null);
+  // Three outcomes, not two. A job can also finish having failed on every single
+  // recording, which the runner reports as ordinary completion — so this used to
+  // clear the banner and say nothing, and pressing Transcribe looked like it
+  // started and quietly stopped.
+  const r = j.result ?? {};
+  if (j.error) {
+    banner(`Error: ${j.error}`);
+  } else if (r.failed && !r.done) {
+    offerSetup(`Nothing could be transcribed — ${r.failed} of ${r.total} failed.` +
+      (r.lastError ? ` ${r.lastError}` : ''), /model/i.test(r.lastError ?? ''));
+  } else if (r.failed) {
+    banner(`${r.done} transcribed, ${r.failed} failed.` + (r.lastError ? ` Last error: ${r.lastError}` : ''));
+  } else {
+    banner(null);
+  }
   // A finished download changes what the app can do, so re-probe rather than
   // leaving the dialog claiming the model is still missing.
   if (j.kind === 'model') loadSetup();
