@@ -53,3 +53,28 @@ test('refuses to judge a collapse from too few words', () => {
   // send healthy recordings through a pointless second pass.
   assert.equal(looksCollapsed([seg('алло да')]), false);
 });
+
+test('drops the stage directions the model writes instead of transcribing', () => {
+  // These arrive when there is sound but no intelligible speech. One 55-minute
+  // recording in the real archive transcribed as nothing but the first of these.
+  const junk = ['ТЕЛЕФОННЫЙ ЗВОНОК', '/Слышен звонок в дверь/', '[музыка]', '(смех)'];
+  const { segments } = filterSegments([
+    ...junk.map((text, i) => ({ t0: i * 1000, t1: i * 1000 + 900, text })),
+    { t0: 9000, t1: 12000, text: 'Алло, ты меня слышишь?' },
+  ]);
+  assert.deepEqual(segments.map((s) => s.text.trim()), ['Алло, ты меня слышишь?']);
+});
+
+test('keeps speech that merely happens to be short or emphatic', () => {
+  // The capitals rule must not eat real utterances. Anything with lowercase
+  // letters is speech.
+  const { segments } = filterSegments([
+    { t0: 0, t1: 900, text: 'Да.' },
+    { t0: 1000, t1: 2000, text: 'Ага, понял.' },
+    { t0: 2100, t1: 3000, text: 'Алё!' },
+    { t0: 3100, t1: 4000, text: '2019' },
+    { t0: 4100, t1: 5000, text: '8 495 123-45-67' },
+  ]);
+  assert.equal(segments.length, 5,
+    'short answers are most of a phone call, and a spoken number is speech');
+});

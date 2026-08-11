@@ -21,6 +21,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /** Nothing is open yet on first run; the interface asks for a folder. */
 let currentRoot = null;
@@ -72,7 +73,12 @@ export function abs(relPath) {
 
 /** Speech models and helper binaries belong to the installation, not the archive. */
 export const appPaths = {
-  bin: path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', 'bin'),
+  // fileURLToPath, not URL.pathname: pathname keeps percent-encoding, so on any
+  // path containing a space this yielded ".../Voice%20History.app/...". That is a
+  // path that does not exist — and since the write-location probe used to create
+  // directories, the app dutifully built a whole bogus tree under /Applications
+  // and downloaded gigabytes of models into it.
+  bin: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin'),
   /** Where a model would be WRITTEN. To find one, use modelDirs(). */
   get models() { return modelsWriteDir(); },
 };
@@ -116,9 +122,22 @@ export function modelDirs() {
  */
 export function modelsWriteDir() {
   for (const dir of modelDirs()) {
+    // Asking whether we COULD write here must not itself create anything. The
+    // first version called mkdirSync, so merely reporting where a model would go
+    // materialized the directory — which is how a mistyped path became a real
+    // tree on disk. Walk up to the nearest existing ancestor and test that.
     try {
-      fs.mkdirSync(dir, { recursive: true });
-      fs.accessSync(dir, fs.constants.W_OK);
+      let probe = dir;
+      while (!fs.existsSync(probe)) {
+        const parent = path.dirname(probe);
+        if (parent === probe) break;
+        probe = parent;
+      }
+      // Must be a writable DIRECTORY. Inside a packaged app the nearest existing
+      // ancestor is app.asar, which is a file: writable by permission, and
+      // incapable of holding anything.
+      if (!fs.statSync(probe).isDirectory()) continue;
+      fs.accessSync(probe, fs.constants.W_OK);
       return dir;
     } catch { /* try the next one */ }
   }
@@ -132,7 +151,9 @@ export function ensureDirs() {
   for (const p of [paths.inbox, paths.recordings, paths.audio, paths.transcripts, paths.tmp]) {
     fs.mkdirSync(p, { recursive: true });
   }
-  fs.mkdirSync(appPaths.models, { recursive: true });
+  // The models directory is deliberately NOT created here. It belongs to the
+  // installation rather than the archive, it may legitimately be unwritable, and
+  // whoever downloads a model creates it then.
 }
 
 /**

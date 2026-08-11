@@ -55,6 +55,18 @@ const punctuationSeed = () => config.PROMPT ?? PROMPTS[config.LANGUAGE] ?? PROMP
  * re-transcription.
  */
 const HALLUCINATIONS = [
+  // Stage directions. Trained on subtitles, the model describes sounds it cannot
+  // transcribe instead of returning nothing: a 55-minute recording came back as
+  // the single line "ТЕЛЕФОННЫЙ ЗВОНОК". Found in 149 recordings of a 5,398-file
+  // archive, always as the whole segment, never inside speech.
+  //
+  // Matched structurally rather than by phrase: subtitle conventions wrap such
+  // remarks in slashes, brackets or parentheses, or set them in capitals.
+  /^\s*[/[(][^)\]/]{0,80}[/\])]\s*$/,
+  // Three or more capitals and not a single lowercase letter. Requiring the
+  // capitals matters: a segment of digits alone is a spoken number, not a
+  // stage direction.
+  /^(?=(?:[^\p{Ll}]*\p{Lu}){3})[^\p{Ll}]{3,60}$/u,
   // Any mention of subtitles at all — nobody says "subtitles" on a phone call,
   // whereas the model produces endless variants of subtitle credits: "subtitles
   // by X", "thanks for the subtitles X", "subtitle editor X". Anchoring these to

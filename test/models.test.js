@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import * as models from '../core/models.js';
-import { modelDirs, modelsWriteDir } from '../core/paths.js';
+import { modelDirs, modelsWriteDir, appPaths } from '../core/paths.js';
 
 /** Runs fn with VH_MODELS_DIR pointed at a fresh directory. */
 function withModelsDir(fn) {
@@ -99,5 +99,31 @@ test('an unwritable candidate is skipped rather than returned', () => {
     else process.env.VH_MODELS_DIR = before;
     fs.chmodSync(locked, 0o700);
     fs.rmSync(locked, { recursive: true, force: true });
+  }
+});
+
+test('a path containing a space is handled as a path, not as a URL', () => {
+  // appPaths.bin is derived from this module's own location. Deriving it via
+  // URL.pathname leaves percent-encoding, so an app installed as
+  // "Voice History.app" looked for models under "Voice%20History.app" — a
+  // directory that does not exist, and which the app then created and filled
+  // with gigabytes of downloads.
+  assert.ok(!appPaths.bin.includes('%20'), `bin path is percent-encoded: ${appPaths.bin}`);
+  assert.ok(!modelDirs().some((d) => d.includes('%')), 'no candidate may be percent-encoded');
+});
+
+test('asking where a model would go does not create anything', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'vh-probe-'));
+  const target = path.join(base, 'deep', 'models');
+  const before = process.env.VH_MODELS_DIR;
+  process.env.VH_MODELS_DIR = target;
+  try {
+    assert.equal(modelsWriteDir(), target, 'it is writable, via an ancestor that exists');
+    assert.equal(fs.existsSync(target), false,
+      'a question about where a file would go must not put a directory on disk');
+  } finally {
+    if (before === undefined) delete process.env.VH_MODELS_DIR;
+    else process.env.VH_MODELS_DIR = before;
+    fs.rmSync(base, { recursive: true, force: true });
   }
 });
