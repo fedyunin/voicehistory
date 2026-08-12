@@ -56,15 +56,33 @@ async function main() {
 
   const settle = () => page.waitForTimeout(700);
 
-  // 01 — the archive with a call open: list, player, synced transcript.
+  // 01 — what the window opens on: the archive as a whole. Taller, because this
+  // pane runs from "on this day" down through the activity map.
+  await page.setViewportSize({ width: 1420, height: 1500 });
+  await settle();
+  await shot('01-overview');
+  await page.setViewportSize({ width: 1420, height: 900 });
+  await settle();
+
+  // 02 — one person: how long you have known them, and their days.
+  await page.locator('aside.side #contacts li').first().click();
+  await page.waitForSelector('#detail .heat-year', { timeout: 15_000 });
+  await page.setViewportSize({ width: 1420, height: 1500 });
+  await settle();
+  await shot('02-person');
+  await page.setViewportSize({ width: 1420, height: 900 });
+  await page.locator('#filters button').first().click();     // Show everything
+  await settle();
+
+  // 03 — a call open: list, player, synced transcript.
   await page.locator('#calls li').nth(2).click();
   await page.waitForSelector('#detail audio', { timeout: 15_000 });
   await settle();
-  await shot('01-archive');
+  await shot('03-archive');
 
   await page.emulateMedia({ colorScheme: 'dark' });
   await settle();
-  await shot('01-archive-dark');
+  await shot('03-archive-dark');
   await page.emulateMedia({ colorScheme: 'light' });
   await settle();
 
@@ -72,18 +90,20 @@ async function main() {
   // shows matches in context rather than a single hit.
   await page.fill('#q', 'garden');
   await page.waitForTimeout(1200);
-  await shot('02-search');
+  await shot('04-search');
 
   await page.fill('#q', '');
   await page.waitForTimeout(900);
 
   // 03 — filters: narrowing by person, and how to get back out again.
-  await page.locator('aside.side #contacts li').first().click();
+  // 05 — the recordings recognition got wrong, which the archive points at
+  // rather than leaving to be found by scrolling.
+  await page.locator('aside.side #review li').last().click();
   await page.waitForSelector('#filters:not([hidden])', { timeout: 10_000 });
   await settle();
-  await shot('03-filters');
+  await shot('05-review');
 
-  await page.locator('#filters button').last().click();
+  await page.locator('#filters button').first().click();
   await settle();
 
   const dialog = async (opener, sel, name) => {
@@ -96,15 +116,15 @@ async function main() {
   };
 
   // 04 — the people dialog, 05 — transcription queue.
-  await dialog('#btn-people', '#dlg-people', '04-people');
-  await dialog('#btn-jobs', '#dlg-jobs', '05-transcribe');
+  await dialog('#btn-people', '#dlg-people', '06-people');
+  await dialog('#btn-jobs', '#dlg-jobs', '07-transcribe');
 
   // 06 — settings, on a taller window: the dialog runs from disk usage down to
   // the danger zone, and half of it in shot would misrepresent the point, which
   // is that every destructive action states its cost up front.
   await page.setViewportSize({ width: 1420, height: 1700 });
   await settle();
-  await dialog('#btn-settings', '#dlg-settings', '06-settings');
+  await dialog('#btn-settings', '#dlg-settings', '08-settings');
 
   await app.close();
 
@@ -119,7 +139,10 @@ async function main() {
       ...process.env,
       VH_ROOT: root,
       VH_APP_CONFIG_DIR: path.join(root, '.tmp', 'screenshot-config'),
-      VH_MODEL: 'large-v3',
+      // Must name a model NOT downloaded on the machine taking the shots — the
+      // dialog only appears when something is genuinely missing, and the search
+      // looks in every known location, so an empty models directory will not do.
+      VH_MODEL: 'medium',
       ELECTRON_RUN_AS_NODE: undefined,
     },
   });
@@ -127,9 +150,9 @@ async function main() {
   await p2.setViewportSize({ width: 1420, height: 900 });
   await p2.waitForSelector('#dlg-setup[open]', { timeout: 30_000 });
   await p2.waitForTimeout(900);
-  await p2.screenshot({ path: path.join(outDir, '07-setup.png') });
-  shots.push('07-setup');
-  console.log('  07-setup.png');
+  await p2.screenshot({ path: path.join(outDir, '09-setup.png') });
+  shots.push('09-setup');
+  console.log('  09-setup.png');
   await fresh.close();
 }
 

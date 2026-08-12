@@ -16,15 +16,15 @@ it at your folder.
 Nothing leaves your machine. No server, no account, no cloud service — the only
 network access in the project is a one-time download of the speech model.
 
-Built against a real archive: **5,372 recordings, 501 hours, 2019–2026**,
+Built against a real archive: **5,398 recordings, 505 hours, 2019–2026**,
 exported from [Cube ACR](https://cubeacr.app/) as 8 kHz AMR files.
 
-![The archive view: years and people on the left, calls in the middle, player and synced transcript on the right](docs/01-archive.png)
+![The window on opening: years, people and anything needing review on the left, calls in the middle, and the archive read as a whole on the right — this day in earlier years, what each year was about, hours a year, every day as a map, and who the time went to](docs/01-overview.png)
 
 <sub>Screenshots use a generated demo archive — invented people, invented
 conversations — and are produced by <code>npm run demo &amp;&amp; npm run screenshots</code>,
 so they cannot drift from the interface. It follows your system light/dark
-setting: <a href="docs/01-archive-dark.png">dark version</a>.</sub>
+setting: <a href="docs/03-archive-dark.png">dark version</a>.</sub>
 
 ## Quick start
 
@@ -87,8 +87,6 @@ macOS both are one command: `brew install ffmpeg whisper-cpp`.
 The app checks on launch and says what is missing, where each tool was found, and
 what to run. The speech model it downloads for you.
 
-![The Requirements dialog: the speech model with a Download button, and ffmpeg, ffprobe and whisper-cli each shown with the absolute path they were found at](docs/07-setup.png)
-
 Binaries are left to you on purpose. Fetching them would mean shipping an
 installer for someone else's software, taking on ffmpeg's licensing, and
 verifying downloads — while the model is a single file of published weights that
@@ -97,7 +95,7 @@ terminal.
 
 ## Using it
 
-Everything happens through three buttons.
+Three buttons do the work.
 
 **Import** — takes a folder of recordings. Drop files into the archive's
 `inbox/`, or paste the path to a phone export. Recordings are filed into
@@ -114,16 +112,34 @@ at the end of the current recording. Follow it from a terminal instead with
 names in. Numbers are normalized so the same person written two different ways
 becomes one contact.
 
-Then: browse by year or person, search across every transcript, and click any
-line of a transcript to jump to that moment in the audio. Searching and jumping
-to a result seeks the audio to the phrase that matched, not to the start of the
-call.
+Then read it. The window opens on the archive as a whole rather than an empty
+pane: this day in earlier years, what each year was about, hours a year, every
+day as a map you can click, and who the time actually went to — ranked by hours,
+not by number of calls, or a bank's notifications would outrank a parent.
 
-| Full-text search across every transcript | Naming the people behind the numbers |
+Select a person and the same pane becomes their story: how long you have known
+them, how it rose and fell year by year, their longest conversations, and the
+words that stand out in them. People are grouped by name, so someone with four
+numbers is one person.
+
+![One person: calls, hours and years together, the words that stand out in them, their days as a map, and their longest conversations](docs/02-person.png)
+
+Search across every transcript, and click any line to jump to that moment in the
+audio — a search hit seeks to the phrase that matched, not to the start of the
+call. Arrow keys walk the list without going back to it, Escape steps back out,
+and the list extends itself as you reach the end of it.
+
+| A recording open: player and transcript, synced | Full-text search across every transcript |
 |---|---|
-| ![Search results, each showing the matching phrase highlighted in context](docs/02-search.png) | ![The People dialog, listing contacts with editable names](docs/04-people.png) |
-| Filtering by person or year, and clearing it again | The transcription queue, resumable and skippable |
-| ![The list narrowed to one person, with a chip naming the active filter and an × to remove it](docs/03-filters.png) | ![The Transcription dialog: queue counts, ordering choice, and re-transcribe](docs/05-transcribe.png) |
+| ![A call with its player at the top and the transcript below, each line a click from that moment in the audio](docs/03-archive.png) | ![Search results, each showing the matching phrase highlighted in context](docs/04-search.png) |
+| What recognition got wrong, found for you | Naming the people behind the numbers |
+| ![The list narrowed to recordings whose transcription looks doubtful, with a chip naming the reason and a button to re-run them all](docs/05-review.png) | ![The People dialog, listing contacts with editable names](docs/06-people.png) |
+| The transcription queue, resumable and skippable | What the app needs installed |
+| ![The Transcription dialog: queue counts, ordering choice, and re-transcribe](docs/07-transcribe.png) | ![The Requirements dialog: the speech model with a Download button, and each tool shown with the path it was found at](docs/09-setup.png) |
+
+Recognition does not fail loudly — for a recording it made nothing of, it
+returns one plausible line as readily as a real transcript. **Needs review** in
+the sidebar names the shapes worth doubting and offers to run them again.
 
 ## How it works
 
@@ -273,7 +289,7 @@ Settings shows what is on disk and what each destructive action would cost.
 Anything irreversible states what it destroys and what survives, and needs a
 phrase typed to confirm.
 
-![The Settings dialog showing disk usage and a danger zone where each action states what it destroys and what survives](docs/06-settings.png)
+![The Settings dialog showing disk usage and a danger zone where each action states what it destroys and what survives](docs/08-settings.png)
 
 ## Privacy and legality
 

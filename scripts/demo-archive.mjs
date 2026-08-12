@@ -194,6 +194,83 @@ const CALLS = [
   { at: '20260530-173015', who: '+15550100178', app: 'phone', dir: 'Incoming', pending: true },
 ];
 
+// Eighteen hand-written conversations show the interface; they do not show what
+// it looks like with a history behind it. The activity map needs a month of days
+// before it appears at all, and the review rules and year words are shares of the
+// archive, so on a handful of recordings they correctly report nothing.
+//
+// So the demo also carries filler: enough calls, spread across the same years, for
+// those views to have something true to display. Deterministic — a fixed
+// generator rather than a random one, so two runs produce the same archive and a
+// screenshot can be reproduced.
+const FILLER_LINES = CALLS.flatMap((c) => c.lines ?? []).map(([, , text]) => text);
+const FILLER_PEOPLE = Object.keys(PEOPLE);
+
+function lcg(seed) {
+  let x = seed;
+  return () => (x = (x * 1103515245 + 12345) % 2147483648) / 2147483648;
+}
+
+function generateFiller(count) {
+  const rnd = lcg(20260812);
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    // Weighted across the years the hand-written calls span, so some years read
+    // as busy and others as quiet — which is the whole point of the map.
+    const year = [2019, 2020, 2020, 2020, 2021, 2021, 2022, 2022, 2022, 2023,
+                  2024, 2025, 2025, 2026][Math.floor(rnd() * 14)];
+    const month = 1 + Math.floor(rnd() * 12);
+    const day = 1 + Math.floor(rnd() * 28);
+    const hour = 8 + Math.floor(rnd() * 14);
+    const min = Math.floor(rnd() * 60);
+    const sec = Math.floor(rnd() * 60);
+    const at = `${year}${String(month).padStart(2, '0')}${String(day).padStart(2, '0')}`
+      + `-${String(hour).padStart(2, '0')}${String(min).padStart(2, '0')}${String(sec).padStart(2, '0')}`;
+
+    const who = rnd() < 0.12 ? null : FILLER_PEOPLE[Math.floor(rnd() * FILLER_PEOPLE.length)];
+    const n = 1 + Math.floor(rnd() * 7);
+    const lines = [];
+    let t = 0;
+    for (let k = 0; k < n; k++) {
+      const len = 2500 + Math.floor(rnd() * 6000);
+      lines.push([t, t + len, FILLER_LINES[Math.floor(rnd() * FILLER_LINES.length)]]);
+      t += len + 400 + Math.floor(rnd() * 1200);
+    }
+    out.push({
+      at,
+      who: who === null ? null : (String(who).startsWith('+') ? who : Number(who)),
+      app: 'phone',
+      dir: rnd() < 0.5 ? 'Incoming' : 'Outgoing',
+      lines,
+    });
+  }
+  return out;
+}
+
+CALLS.push(...generateFiller(260));
+
+// A few recordings the recognizer plainly failed on, so the review section has
+// something true to point at. Every real archive has these; a demo without them
+// would show that feature as an empty heading.
+CALLS.push(
+  // Long calls with one phrase recovered out of them.
+  { at: '20210620-104512', who: '+15550100117', app: 'phone', dir: 'Incoming',
+    lines: [[0, 4200, 'Hello? Hello, can you hear me?']], minutes: 34 },
+  { at: '20220914-201133', who: '+15550100142', app: 'phone', dir: 'Outgoing',
+    lines: [[0, 3100, 'One moment.']], minutes: 21 },
+  { at: '20250412-153001', who: '+15550100164', app: 'phone', dir: 'Incoming',
+    lines: [[0, 2600, 'Yes?']], minutes: 47 },
+  // A decode that collapsed: a long run with no sentence punctuation at all.
+  { at: '20230715-181240', who: '+15550100191', app: 'phone', dir: 'Incoming',
+    lines: [[0, 62000, ('so then we went round the back and it was still open so i said '
+      + 'nothing and we waited a while and then the other one came out and asked us '
+      + 'what we wanted and i said nothing again because there was no point ').repeat(3)]],
+    minutes: 12 },
+  // Minutes of audio the recognizer reported as having no speech in it.
+  { at: '20200518-093000', who: '+15550100203', app: 'phone', dir: 'Incoming', silent: 640000 },
+  { at: '20240301-171500', who: null, app: 'phone', dir: 'Incoming', silent: 420000 },
+);
+
 /** Cube's naming: app_YYYYMMDD-HHMMSS_contact.ext, number optionally underscored. */
 function fileNameFor(call) {
   const who = call.who === null ? ''
@@ -203,7 +280,11 @@ function fileNameFor(call) {
   return `${call.app}_${call.at}${who}.m4a`;
 }
 
-const durationOf = (call) => (call.lines ? call.lines.at(-1)[1] + 1800 : call.silent ? call.silent : 47000);
+const durationOf = (call) => (
+  call.minutes ? call.minutes * 60000
+  : call.lines ? call.lines.at(-1)[1] + 1800
+  : call.silent ? call.silent
+  : 47000);
 
 /**
  * Tone audio at the length the call claims to be. Speech is not synthesized:
