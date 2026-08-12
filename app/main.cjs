@@ -41,7 +41,7 @@ protocol.registerSchemesAsPrivileged([{
 let paths, abs, hasRoot, bus, progress, db, runner, lock, appsettings, session, archive, config,
     maintenance, list, recording, contacts, people, years,
     importFiles, transcribePending, retranscribe, scanInbox, backfillProps, reindex, modelAvailable,
-    vcardsToOverrides, choices, matchPlan, tools, models, abort, about, review, stats;
+    vcardsToOverrides, choices, matchPlan, tools, models, abort, about, review, stats, words;
 
 async function loadCore() {
   const m = async (p) => import(pathToFileURL(path.join(HERE, '..', 'core', p)).href);
@@ -66,6 +66,7 @@ async function loadCore() {
   about = await m('about.js');
   review = await m('review.js');
   stats = await m('stats.js');
+  words = await m('words.js');
   abort = await m('abort.js');
 }
 
@@ -118,10 +119,13 @@ const API = {
   /* --- archive --- */
   archive: () => session.archiveState(),
 
-  overview: () => stats.overview(),
+  overview: () => ({ ...stats.overview(), words: words.byYear() }),
   onthisday: ({ day }) => stats.onThisDay(day || undefined),
   people: () => people(),
-  person: ({ name }) => stats.person(name ?? '') ?? { error: 'no such person' },
+  person: ({ name }) => {
+    const p = stats.person(name ?? '');
+    return p ? { ...p, words: words.forPerson(p.name) } : { error: 'no such person' };
+  },
   review: () => ({ reasons: review.counts() }),
 
   about: () => ({

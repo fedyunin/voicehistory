@@ -128,7 +128,7 @@ export function recording(id) {
  * conversation you half-remember, so recall matters far more than a few extra
  * matches.
  */
-function stem(word) {
+export function stem(word) {
   if (word.length >= 8) return word.slice(0, -3);
   if (word.length >= 5) return word.slice(0, -2);
   return word;

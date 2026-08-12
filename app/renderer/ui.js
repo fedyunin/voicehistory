@@ -340,6 +340,16 @@ async function showPerson(name) {
     format: (v) => fmtDur(v),
   }));
 
+  if (p.words?.length) {
+    const box = el('div', 'chart');
+    box.append(el('h3', 'sect-title', 'Words that stand out'));
+    const line = el('div', 'words');
+    line.textContent = p.words.map((w) => w.word).join(', ');
+    line.title = p.words.map((w) => `${w.word} — in ${w.calls} calls`).join('\n');
+    box.append(line);
+    d.append(box);
+  }
+
   if (p.byHour.length > 1) {
     d.append(bars(p.byHour, {
       title: 'When you talk',
@@ -411,6 +421,21 @@ async function showOverview() {
     }
     if (today.rows.length > 8) {
       box.append(el('div', 'muted tiny', `and ${today.rows.length - 8} more`));
+    }
+    d.append(box);
+  }
+
+  if (o.words?.length) {
+    // Not the commonest words — those are "да" and "ну" in every year alike —
+    // but the ones that stand out against the rest of the archive.
+    const box = el('div', 'chart');
+    box.append(el('h3', 'sect-title', 'What each year was about'));
+    for (const y of o.words) {
+      const row = el('div', 'day-row words-row');
+      row.append(el('span', 'name', y.year));
+      row.append(el('span', 'words', y.words.map((w) => esc(w.word)).join(', ')));
+      row.title = y.words.map((w) => `${w.word} — in ${w.calls} calls`).join('\n');
+      box.append(row);
     }
     d.append(box);
   }

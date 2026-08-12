@@ -310,6 +310,38 @@ means distributing someone else's software under GPL/LGPL obligations, from
 sources that differ per platform, with checksums to verify. That is an installer,
 not a feature.
 
+## What a year was about
+
+Not the commonest words — those are "да", "ну", "вот" in every year of every
+archive. What carries meaning is contrast: the words that stand out here against
+everything else recorded. Stop words score zero on that measure by construction,
+so no hand-written list of them is needed, in any language.
+
+Three findings, each from a run that looked wrong:
+
+**Count recordings, not occurrences.** Scored by occurrences, one word shouted
+across two long calls looked like the theme of a year — `катанем(1132)` — and so
+did every consistent mistranscription, `бранхит(586)` among them. Counting each
+word once per recording removed both without a single special case.
+
+**Do not stem the corpus.** Folding words with this project's crude search
+stemmer merged unrelated words into one bucket and the scoring degenerated until
+"почти" and "теперь" outranked "карантин". Inflections are folded in the
+finished list instead, by shared prefix among the winners.
+
+**Normalize in the same unit as the groups.** Dividing by the number of
+recordings rather than the sum of document frequencies inverted the comparison
+and put function words on top again — the same symptom as the stemming mistake,
+from an unrelated cause, which is what made it worth writing down.
+
+What it produces on the archive this was built against: 2020 is
+`самоизоляции, карантин, заболевших, пневмонией`; 2021 `антитела, вакцинация`;
+2022 `домклик, сделке, ипотечные, продавцу`. The years read as a chronicle
+without anyone having tagged anything.
+
+Under a second over 4,461 transcripts and 982,000 words, cached per process and
+discarded when the transcript count moves.
+
 ## One person, across their numbers
 
 Selecting a name now shows the relationship rather than only its calls: how long

@@ -400,3 +400,7 @@ button.linkish {
 .day-row:hover { background: var(--accent-soft); }
 .day-row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .day-row .person-n { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.words-row { grid-template-columns: 52px 1fr; cursor: default; align-items: baseline; }
+.words-row:hover { background: none; }
+.words { color: var(--ink); font-size: 13px; line-height: 1.5; }

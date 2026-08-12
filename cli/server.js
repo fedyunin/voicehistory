@@ -23,6 +23,7 @@ import * as models from '../core/models.js';
 import * as about from '../core/about.js';
 import * as review from '../core/review.js';
 import * as stats from '../core/stats.js';
+import * as words from '../core/words.js';
 import * as abort from '../core/abort.js';
 import { vcardsToOverrides } from '../core/contactbook.js';
 import * as maintenance from '../core/maintenance.js';
@@ -142,13 +143,16 @@ async function api(req, res, url) {
       return json(res, 200, people());
 
     case 'person':
-      return json(res, 200, stats.person(q.get('name') ?? '') ?? { error: 'no such person' });
+      {
+        const p2 = stats.person(q.get('name') ?? '');
+        return json(res, 200, p2 ? { ...p2, words: words.forPerson(p2.name) } : { error: 'no such person' });
+      }
 
     case 'onthisday':
       return json(res, 200, stats.onThisDay(q.get('day') || undefined));
 
     case 'overview':
-      return json(res, 200, stats.overview());
+      return json(res, 200, { ...stats.overview(), words: words.byYear() });
 
     case 'review':
       return json(res, 200, { reasons: review.counts() });
