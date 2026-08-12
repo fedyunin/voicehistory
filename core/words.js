@@ -95,10 +95,13 @@ function sameRoot(a, b) {
  * Log-odds of a stem inside this group against the whole archive. A word spread
  * evenly scores about zero; one concentrated here scores high.
  */
-function distinctive(t, group, { minDocs = 4, top = 10 } = {}) {
+function distinctive(t, group, { top = 10 } = {}) {
+  // A word has to appear in a share of the archive, not in a fixed number of
+  // recordings. Four was right for 4,461 transcripts and impossible for 200.
+  const minDocs = Math.max(2, Math.round(t.docs * 0.001));
   if (!group) return [];
   const size = [...group.values()].reduce((a, b) => a + b, 0);
-  if (size < 400) return [];              // too little text to say anything
+  if (size < t.sum * 0.005) return [];    // too little text here to say anything
   const scored = [];
   for (const [w, n] of group) {
     if (n < minDocs) continue;

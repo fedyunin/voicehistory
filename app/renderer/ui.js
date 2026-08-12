@@ -164,6 +164,33 @@ function clearFilters() {
   refilter();
 }
 
+/**
+ * The next or previous recording in the list as it is currently filtered.
+ * Loads another page when it runs off the end, so a long filter walks through
+ * without the reader ever meeting the "load more" button.
+ */
+async function stepRecording(delta) {
+  const items = [...$('calls').children];
+  if (!items.length) return;
+  const at = items.findIndex((li) => Number(li.dataset.id) === state.currentId);
+  // Nothing open yet: the first item is the obvious place to start.
+  if (at === -1) return openRecording(Number(items[0].dataset.id));
+
+  const next = at + delta;
+  if (next < 0) return;
+  if (next >= items.length) {
+    if (items.length >= state.total) return;      // that was the last one
+    state.offset += PAGE;
+    await loadList(false);
+    const grown = [...$('calls').children];
+    if (next < grown.length) return openRecording(Number(grown[next].dataset.id));
+    return;
+  }
+  const li = items[next];
+  li.scrollIntoView({ block: 'nearest' });
+  return openRecording(Number(li.dataset.id));
+}
+
 /** A visible way back, at the top of whatever the pane is showing. */
 function backTo(label, fn) {
   const b = el('button', 'backlink', `‹ ${label}`);
@@ -786,6 +813,18 @@ function wire() {
   }
 
   $('btn-jobs').onclick = guard(async () => { await refreshStats(); $('dlg-jobs').showModal(); });
+
+  // Left and right walk the current filter without going back to the list —
+  // the way a mail client walks a folder. With 1,897 calls to one person, this
+  // removes more scrolling than any view does.
+  document.addEventListener('keydown', (e) => {
+    if (document.querySelector('dialog[open]')) return;
+    if (/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName ?? '')) return;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      stepRecording(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
 
   // Escape steps back one level, the way it does everywhere else.
   document.addEventListener('keydown', (e) => {
