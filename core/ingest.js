@@ -316,7 +316,10 @@ async function runTranscribe({
     // Announce the file as work begins, not when it ends. A 27-minute call takes
     // minutes, and until it finished the interface showed no sign of which
     // recording was being worked on.
-    progress({ phase: 'transcribe', done: done + failed, total, file: rec.orig_name });
+    // The recording's length travels with the event. Without it a six-hour call
+    // looks identical to a stuck job: the counter says "0 of 30" for hours and
+    // there is nothing on screen to say why.
+    progress({ phase: 'transcribe', done: done + failed, total, file: rec.orig_name, fileMs: rec.duration_ms });
     const src = abs(rec.rel_path);
     const wav = path.join(paths.tmp, `${rec.id}.wav`);
 
@@ -343,7 +346,10 @@ async function runTranscribe({
         db.markSilent(rec.id, rel(tPath), note);
         done++;
         db.bumpJob(jobId, { done: 1 });
-        progress({ phase: 'transcribe', done: done + failed, total, file: rec.orig_name });
+        // The recording's length travels with the event. Without it a six-hour call
+    // looks identical to a stuck job: the counter says "0 of 30" for hours and
+    // there is nothing on screen to say why.
+    progress({ phase: 'transcribe', done: done + failed, total, file: rec.orig_name, fileMs: rec.duration_ms });
         continue;
       }
 
@@ -406,7 +412,10 @@ async function runTranscribe({
       fs.rmSync(wav, { force: true });
     }
 
-    progress({ phase: 'transcribe', done: done + failed, total, file: rec.orig_name });
+    // The recording's length travels with the event. Without it a six-hour call
+    // looks identical to a stuck job: the counter says "0 of 30" for hours and
+    // there is nothing on screen to say why.
+    progress({ phase: 'transcribe', done: done + failed, total, file: rec.orig_name, fileMs: rec.duration_ms });
   }
 
   db.finishJob(jobId, failed && !done ? 'failed' : 'done', nowIso(), JSON.stringify({ done, failed, lastError }));

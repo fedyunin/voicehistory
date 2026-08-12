@@ -886,10 +886,11 @@ const LABEL = {
 
 function onProgress(p) {
   if (p.phase === 'log') return;
-  showProgress({ kind: p.phase, done: p.done, total: p.total, file: p.file });
+  showProgress({ kind: p.phase, done: p.done, total: p.total, file: p.file, fileMs: p.fileMs });
 }
 
 let refreshTimer = null;
+let tickTimer = null;
 let jobStartedAt = null;
 
 /** Linear projection from elapsed time — crude, and honest about being a guess. */
@@ -913,7 +914,9 @@ function fmtSpan(ms) {
 
 function onJob(j) {
   if (j.running) { showProgress(j); return; }
+  clearTimeout(tickTimer);
   jobStartedAt = null;
+  currentFile = null;
   $('progress').hidden = true;
   const b = $('prog-cancel');
   b.disabled = false;
@@ -939,7 +942,11 @@ function onJob(j) {
   refreshAll();
 }
 
-function showProgress({ kind, done = 0, total = 0, file, startedAt, stopping }) {
+/** When the current file started, so a long one can show that it is progressing. */
+let fileStartedAt = null;
+let currentFile = null;
+
+function showProgress({ kind, done = 0, total = 0, file, fileMs, startedAt, stopping }) {
   $('progress').hidden = false;
   $('prog-label').textContent = stopping ? 'Stopping…' : (LABEL[kind] ?? kind);
   // Counting bytes as if they were files would read as "412000000 of 1500000000".
@@ -947,7 +954,17 @@ function showProgress({ kind, done = 0, total = 0, file, startedAt, stopping }) 
     : kind === 'model' ? `${fmtBytes(done)} of ${fmtBytes(total)}`
     : `${done} of ${total}`;
   $('prog-fill').style.width = total ? `${(done / total) * 100}%` : '0';
-  if (file) $('prog-file').textContent = file;
+  if (file) {
+    // A single recording can be six hours long, and recognition runs slower than
+    // realtime. Saying only its name leaves the window looking frozen, so say how
+    // big it is and how long it has been running.
+    if (file !== currentFile) { currentFile = file; fileStartedAt = Date.now(); }
+    const parts = [file];
+    if (fileMs) parts.push(fmtSpan(fileMs) + ' long');
+    const elapsed = Date.now() - fileStartedAt;
+    if (elapsed > 20000) parts.push(fmtSpan(elapsed) + ' on this one');
+    $('prog-file').textContent = parts.join('  ·  ');
+  }
 
   // A run measured in tens of hours needs to say when it will be done. Without
   // it the only honest answer to "how long" was to go and count in the terminal.
@@ -958,6 +975,11 @@ function showProgress({ kind, done = 0, total = 0, file, startedAt, stopping }) 
     b.disabled = true;
     b.textContent = 'Stopping…';
   }
+
+  // Redraw the elapsed figure even when no event arrives — a long recording
+  // produces exactly one progress event and then silence for hours.
+  clearTimeout(tickTimer);
+  if (!stopping) tickTimer = setTimeout(() => showProgress({ kind, done, total, file, fileMs, stopping }), 15000);
 
   // Refresh the list during long jobs, but not on every single event.
   if (!refreshTimer) {
