@@ -87,6 +87,7 @@ export const api = {
   maintenance:     () => call('maintenance'),
   overview:        () => call('overview'),
   onThisDay:       (day) => call('onthisday', day ? { day } : {}),
+  days:            (name) => call('days', name ? { name } : {}),
   people:          () => call('people'),
   person:          (name) => call('person', { name }),
   review:          () => call('review'),

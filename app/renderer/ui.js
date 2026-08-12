@@ -10,7 +10,7 @@ const el = (tag, cls, html) => {
   return n;
 };
 
-const state = { q: '', stems: [], contactId: null, contactName: null, year: null, review: null, reviewLabel: null, offset: 0, total: 0,
+const state = { q: '', stems: [], contactId: null, contactName: null, year: null, day: null, review: null, reviewLabel: null, offset: 0, total: 0,
                 currentId: null, segments: [], hits: [], hitAt: 0 };
 
 /* ======================= boot ======================= */
@@ -154,6 +154,7 @@ function syncDetail() {
 /** Back to the whole archive, from any combination of filters. */
 function clearFilters() {
   state.year = null;
+  state.day = null;
   state.contactId = null;
   state.contactName = null;
   state.review = null;
@@ -195,6 +196,13 @@ function renderFilters() {
     });
   }
   if (state.q) active.push({ label: `“${state.q}”`, clear: () => { $('q').value = ''; state.q = ''; } });
+  if (state.day) {
+    active.push({
+      label: new Date(`${state.day}T12:00:00`).toLocaleDateString(undefined,
+        { day: 'numeric', month: 'long', year: 'numeric' }),
+      clear: () => { state.day = null; },
+    });
+  }
   if (state.review) {
     active.push({
       label: state.reviewLabel ?? 'needs review',
@@ -256,6 +264,7 @@ async function loadList(reset, keepPlace = false) {
     q: state.q,
     contactName: state.contactName,
     year: state.year,
+    day: state.day,
     review: state.review,
     offset: keepPlace ? 0 : state.offset,
     limit: keepPlace ? Math.max(PAGE, loaded) : PAGE,
@@ -309,6 +318,60 @@ function callRow(row) {
 }
 
 /* ======================= the archive as a whole ======================= */
+
+/**
+ * A year of days as a 7×53 grid, the shape a decade of habit is legible in.
+ *
+ * A month calendar was the other candidate and loses at both ends: on a dense
+ * archive nearly every cell is filled and carries no information, and crossing
+ * seven years takes eighty pages. Here a year is one strip and the whole archive
+ * fits on a screen — you can see a quiet year go pale.
+ *
+ * Intensity comes from the archive's own distribution, not fixed thresholds; see
+ * stats.days() for why one 98-call day would otherwise flatten everything else.
+ */
+function heatmap(data, { onPick }) {
+  const byDay = new Map(data.rows.map((r) => [r.day, r]));
+  const years = [...new Set(data.rows.map((r) => r.day.slice(0, 4)))].sort();
+  const box = el('div', 'chart');
+  box.append(el('h3', 'sect-title', 'Every day'));
+
+  for (const year of years) {
+    const strip = el('div', 'heat-year');
+    strip.append(el('span', 'heat-label', year));
+    const grid = el('div', 'heat-grid');
+
+    const start = new Date(`${year}-01-01T12:00:00`);
+    const end = new Date(`${year}-12-31T12:00:00`);
+    // Monday-first columns: leading blanks keep weekdays on the same row.
+    const lead = (start.getDay() + 6) % 7;
+    for (let i = 0; i < lead; i++) grid.append(el('span', 'heat-cell blank'));
+
+    for (let t = new Date(start); t <= end; t.setDate(t.getDate() + 1)) {
+      const iso = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+      const hit = byDay.get(iso);
+      const cell = el('span', `heat-cell${hit ? '' : ' none'}${state.day === iso ? ' on' : ''}`);
+      if (hit) {
+        const level = Math.min(1, hit.ms / data.cap);
+        cell.style.opacity = String(0.25 + level * 0.75);
+        cell.title = `${iso} · ${hit.calls} call${hit.calls > 1 ? 's' : ''} · ${fmtDur(hit.ms)}`;
+        cell.onclick = () => onPick(iso);
+      }
+      grid.append(cell);
+    }
+    strip.append(grid);
+    box.append(strip);
+  }
+  return box;
+}
+
+/** Loads and appends the map, or nothing at all when there is too little to map. */
+async function appendHeatmap(d, name = null) {
+  const data = await api.days(name).catch(() => null);
+  if (!data?.worthShowing) return;
+  d.append(heatmap(data, { onPick: (day) => { state.day = day; refilter(); } }));
+}
+
 
 /**
  * Seven years read at once, in the pane that otherwise says "pick a recording".
@@ -379,6 +442,8 @@ async function showPerson(name) {
     box.append(line);
     d.append(box);
   }
+
+  await appendHeatmap(d, p.name);
 
   if (p.byHour.length > 1) {
     d.append(bars(p.byHour, {
@@ -476,6 +541,8 @@ async function showOverview() {
     label: (r) => r.year,
     format: (v) => fmtDur(v),
   }));
+
+  await appendHeatmap(d);
 
   // Ranked by time rather than by number of calls: 2,315 recordings under a
   // minute account for 17 hours, while 33 over an hour account for 49. Counting
@@ -725,7 +792,7 @@ function wire() {
     if (e.key !== 'Escape' || document.querySelector('dialog[open]')) return;
     if (document.activeElement === $('q')) return;
     if (state.currentId) syncDetail();
-    else if (state.contactName || state.year || state.review || state.q) clearFilters();
+    else if (state.contactName || state.year || state.day || state.review || state.q) clearFilters();
   });
 
   // Clicking the name goes back to the archive as a whole — the only way back

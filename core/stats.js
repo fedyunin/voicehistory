@@ -145,3 +145,35 @@ export function onThisDay(monthDay) {
   `).all({ md });
   return { monthDay: md, rows };
 }
+
+/**
+ * One row per day that has recordings, for the activity map.
+ *
+ * The scale is taken from the archive's own distribution rather than fixed
+ * thresholds. This archive has a day with 98 recordings against a usual three or
+ * four; colouring proportionally to the maximum would wash every ordinary day
+ * out to nothing. Clipping at a high percentile keeps the busy days at full
+ * strength and leaves the rest distinguishable — and it carries to an archive of
+ * any size, which a hand-picked number does not.
+ */
+export function days({ contactName = null } = {}) {
+  const d = open();
+  const where = contactName ? 'WHERE c.display_name = @contactName' : '';
+  const rows = d.prepare(`
+    SELECT substr(r.started_at, 1, 10) AS day, COUNT(*) AS calls, SUM(r.duration_ms) AS ms
+    FROM recordings r LEFT JOIN contacts c ON c.id = r.contact_id
+    ${where}
+    GROUP BY day ORDER BY day
+  `).all(contactName ? { contactName } : {});
+
+  const sorted = rows.map((r) => r.ms).sort((a, b) => a - b);
+  const cap = sorted.length ? sorted[Math.floor(sorted.length * 0.95)] : 0;
+
+  return {
+    rows,
+    cap: cap || 1,
+    // Below this there is nothing to navigate: the list is already shorter than
+    // the map would be, and an almost-empty grid reads as a broken feature.
+    worthShowing: rows.length >= 30,
+  };
+}

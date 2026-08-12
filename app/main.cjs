@@ -121,6 +121,7 @@ const API = {
 
   overview: () => ({ ...stats.overview(), words: words.byYear() }),
   onthisday: ({ day }) => stats.onThisDay(day || undefined),
+  days: ({ name }) => stats.days({ contactName: name || null }),
   people: () => people(),
   person: ({ name }) => {
     const p = stats.person(name ?? '');
@@ -189,6 +190,7 @@ const API = {
     year: p.year || null,
     source: p.source || null,
     contactName: p.contactName || null,
+    day: p.day || null,
     review: p.review || null,
     offset: Number(p.offset ?? 0),
     limit: Number(p.limit ?? 60),
@@ -276,7 +278,7 @@ const API = {
 
 /** Endpoints that make no sense until a folder is chosen. */
 const NEEDS_ARCHIVE = new Set([
-  'stats', 'overview', 'onthisday', 'contacts', 'people', 'person', 'years', 'list', 'recording', 'import/scan', 'import/start',
+  'stats', 'overview', 'onthisday', 'days', 'contacts', 'people', 'person', 'years', 'list', 'recording', 'import/scan', 'import/start',
   'transcribe/start', 'reindex', 'contacts/rename', 'contacts/import', 'maintenance',
   'maintenance/run', 'backfill/props', 'settings/update', 'transcribe/again',
 ]);

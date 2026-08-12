@@ -59,7 +59,7 @@ export function years() {
  * Recording list with filters. When q is present the query goes through FTS5
  * and each row carries a highlighted snippet.
  */
-export function list({ q = '', contactId = null, contactName = null, year = null, source = null, review = null, offset = 0, limit = PAGE } = {}) {
+export function list({ q = '', contactId = null, contactName = null, day = null, year = null, source = null, review = null, offset = 0, limit = PAGE } = {}) {
   const d = open();
   const where = [];
   const args = {};
@@ -67,6 +67,7 @@ export function list({ q = '', contactId = null, contactName = null, year = null
   // By name, so selecting a person brings every number they have ever called from.
   if (contactName) { where.push('c.display_name = @contactName'); args.contactName = contactName; }
   if (year) { where.push("substr(r.started_at,1,4) = @year"); args.year = String(year); }
+  if (day) { where.push("substr(r.started_at,1,10) = @day"); args.day = String(day); }
   if (source) { where.push('r.source = @source'); args.source = source; }
   // Doubtful recordings are a filter over the same list rather than a screen of
   // their own: everything that makes the list useful — opening one, reading it,

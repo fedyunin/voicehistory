@@ -66,7 +66,7 @@ export function serve(port = 4321) {
 
 /** Endpoints that make no sense until a folder is chosen. */
 const NEEDS_ARCHIVE = new Set([
-  'stats', 'overview', 'onthisday', 'contacts', 'people', 'person', 'years', 'list', 'recording', 'import/scan', 'import/start',
+  'stats', 'overview', 'onthisday', 'days', 'contacts', 'people', 'person', 'years', 'list', 'recording', 'import/scan', 'import/start',
   'transcribe/start', 'reindex', 'contacts/rename', 'contacts/import', 'maintenance',
   'maintenance/run', 'backfill/props', 'settings/update', 'transcribe/again',
 ]);
@@ -148,6 +148,9 @@ async function api(req, res, url) {
         return json(res, 200, p2 ? { ...p2, words: words.forPerson(p2.name) } : { error: 'no such person' });
       }
 
+    case 'days':
+      return json(res, 200, stats.days({ contactName: q.get('name') || null }));
+
     case 'onthisday':
       return json(res, 200, stats.onThisDay(q.get('day') || undefined));
 
@@ -221,6 +224,7 @@ async function api(req, res, url) {
         year: q.get('year') || null,
         source: q.get('source') || null,
         contactName: q.get('contactName') || null,
+        day: q.get('day') || null,
         review: q.get('review') || null,
         offset: Number(q.get('offset') ?? 0),
         limit: Number(q.get('limit') ?? 60),
