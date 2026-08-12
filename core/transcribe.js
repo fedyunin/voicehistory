@@ -3,7 +3,7 @@
 // whisper.cpp is invoked as an external process rather than through bindings,
 // on purpose. The exact same command works with Metal on macOS, with Vulkan or
 // CUDA on Windows, and on CPU anywhere. Only the binary path differs.
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -19,6 +19,45 @@ const tmpDir = () => paths.tmp;
 
 const exec = promisify(execFile);
 const run = (binPath, args, opts = {}) => exec(binPath, args, { ...opts, signal: signal() });
+
+/**
+ * Runs the recognizer while reading its progress.
+ *
+ * execFile buffers output and hands it over at the end, which is no use for a
+ * six-hour recording: whisper reports progress as it goes, and that report is
+ * the only thing standing between "working" and "apparently frozen". So the
+ * process is spawned and its stderr read line by line.
+ *
+ * The recognizer prints `whisper_print_progress_callback: progress =  42%` to
+ * stderr, and does so even under -np, which suppresses everything else.
+ */
+function runWithProgress(binPath, args, { onProgress } = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(binPath, args, { signal: signal() });
+    // Kept for the error message. Bounded, because a failing run can produce a
+    // great deal of it and none of it belongs in a database column.
+    let tail = '';
+    let last = -1;
+
+    child.stderr.on('data', (chunk) => {
+      const text = String(chunk);
+      tail = (tail + text).slice(-4000);
+      for (const m of text.matchAll(/progress\s*=\s*(\d+)%/g)) {
+        const pct = Number(m[1]);
+        // Only forward movement, and only when it actually changed: this fires
+        // often and every report crosses a process boundary to reach the window.
+        if (pct > last) { last = pct; onProgress?.(pct); }
+      }
+    });
+
+    child.on('error', reject);
+    child.on('close', (code, sig) => {
+      if (code === 0) return resolve();
+      const why = sig ? `killed by ${sig}` : `exited with ${code}`;
+      reject(new Error(`Command failed: ${path.basename(binPath)} ${why}\n${tail.trim()}`));
+    });
+  });
+}
 
 /** Read through a function, not a constant: the archive can change at runtime. */
 export const defaultModel = () => config.MODEL;
@@ -170,6 +209,7 @@ export async function whisperAvailable() {
  */
 export async function transcribeWav(wavPath, {
   model = config.MODEL, language = config.LANGUAGE, prompt = punctuationSeed(),
+  onProgress,
 } = {}) {
   assertModelAllowed(model);
   const mp = modelPath(model);
@@ -184,6 +224,9 @@ export async function transcribeWav(wavPath, {
     '-oj',
     '-of', outBase,
     '-np',
+    // Progress to stderr. Survives -np, which silences everything else, and is
+    // what lets the interface show movement within a single long recording.
+    '-pp',
     // Beam 5. An earlier measurement on one clean file showed no difference
     // against beam 2 and it was lowered for speed; re-measured on degraded phone
     // audio, beam 5 recovers a little more text and more punctuation for about
@@ -197,7 +240,7 @@ export async function transcribeWav(wavPath, {
   if (prompt) args.push('--prompt', prompt);
 
   try {
-    await run(resolveBinary(), args, { maxBuffer: 64 * 1024 * 1024 });
+    await runWithProgress(resolveBinary(), args, { onProgress });
     const jsonPath = `${outBase}.json`;
     const parsed = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
 

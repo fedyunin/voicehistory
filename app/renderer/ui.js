@@ -889,7 +889,7 @@ const LABEL = {
 
 function onProgress(p) {
   if (p.phase === 'log') return;
-  showProgress({ kind: p.phase, done: p.done, total: p.total, file: p.file, fileMs: p.fileMs });
+  showProgress({ kind: p.phase, done: p.done, total: p.total, file: p.file, fileMs: p.fileMs, filePercent: p.filePercent });
 }
 
 let refreshTimer = null;
@@ -949,14 +949,18 @@ function onJob(j) {
 let fileStartedAt = null;
 let currentFile = null;
 
-function showProgress({ kind, done = 0, total = 0, file, fileMs, startedAt, stopping }) {
+function showProgress({ kind, done = 0, total = 0, file, fileMs, filePercent, startedAt, stopping }) {
   $('progress').hidden = false;
   $('prog-label').textContent = stopping ? 'Stopping…' : (LABEL[kind] ?? kind);
   // Counting bytes as if they were files would read as "412000000 of 1500000000".
   $('prog-count').textContent = !total ? ''
     : kind === 'model' ? `${fmtBytes(done)} of ${fmtBytes(total)}`
     : `${done} of ${total}`;
-  $('prog-fill').style.width = total ? `${(done / total) * 100}%` : '0';
+  // The part of the current recording already recognized counts towards the bar.
+  // Otherwise a single hour-long call leaves it frozen at the same width for an
+  // hour, which is what made a working job look like a stuck one.
+  const fraction = total ? (done + (filePercent ?? 0) / 100) / total : 0;
+  $('prog-fill').style.width = `${Math.min(100, fraction * 100)}%`;
   if (file) {
     // A single recording can be six hours long, and recognition runs slower than
     // realtime. Saying only its name leaves the window looking frozen, so say how
@@ -964,6 +968,7 @@ function showProgress({ kind, done = 0, total = 0, file, fileMs, startedAt, stop
     if (file !== currentFile) { currentFile = file; fileStartedAt = Date.now(); }
     const parts = [file];
     if (fileMs) parts.push(fmtSpan(fileMs) + ' long');
+    if (filePercent != null) parts.push(`${filePercent}% recognized`);
     const elapsed = Date.now() - fileStartedAt;
     if (elapsed > 20000) parts.push(fmtSpan(elapsed) + ' on this one');
     $('prog-file').textContent = parts.join('  ·  ');
@@ -982,7 +987,7 @@ function showProgress({ kind, done = 0, total = 0, file, fileMs, startedAt, stop
   // Redraw the elapsed figure even when no event arrives — a long recording
   // produces exactly one progress event and then silence for hours.
   clearTimeout(tickTimer);
-  if (!stopping) tickTimer = setTimeout(() => showProgress({ kind, done, total, file, fileMs, stopping }), 15000);
+  if (!stopping) tickTimer = setTimeout(() => showProgress({ kind, done, total, file, fileMs, filePercent, stopping }), 15000);
 
   // Refresh the list during long jobs, but not on every single event.
   if (!refreshTimer) {

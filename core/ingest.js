@@ -357,15 +357,23 @@ async function runTranscribe({
       // everything, on the strength of one badly degraded file it rescued —
       // measured more widely it costs segmentation on healthy audio, turning 45
       // phrases into 27 and coarsening every seek.
+      // The recognizer's own progress within this recording. Most of this
+      // archive's hours are in calls of ten minutes to an hour, so without it the
+      // counter stands still for most of the run.
+      const onProgress = (pct) => progress({
+        phase: 'transcribe', done: done + failed, total,
+        file: rec.orig_name, fileMs: rec.duration_ms, filePercent: pct,
+      });
+
       await toWhisperWav(src, wav, { normalize: false });
-      let out = await transcribeWav(wav, { model });
+      let out = await transcribeWav(wav, { model, onProgress });
 
       // …but when the decode collapses, normalization is what fixes it. Only the
       // affected minority pays for a second pass.
       if (looksCollapsed(out.segments)) {
         logLine(`${rec.orig_name}: decode looks collapsed, retrying normalized`);
         await toWhisperWav(src, wav, { normalize: true });
-        const retry = await transcribeWav(wav, { model });
+        const retry = await transcribeWav(wav, { model, onProgress });
         if (!looksCollapsed(retry.segments)) out = retry;
       }
 

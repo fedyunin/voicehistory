@@ -310,6 +310,25 @@ means distributing someone else's software under GPL/LGPL obligations, from
 sources that differ per platform, with checksums to verify. That is an installer,
 not a feature.
 
+## Progress inside one recording
+
+Most of this archive's time is not in many files but in long ones: 308 of its
+505 hours are calls between ten minutes and an hour, and 49 more are in 33 calls
+over an hour. A counter that only moves when a file finishes therefore stands
+still for most of a run, which reads as a hung job — and did.
+
+whisper.cpp reports its own progress with `-pp`, on **stderr**, and keeps doing
+so under `-np`, which silences everything else. That output is useless through
+`execFile`, which buffers and hands it over at the end, so the recognizer is
+spawned and its stderr read line by line instead.
+
+The fraction of the current recording counts towards the progress bar, so it
+advances continuously rather than in whole-file steps. Switching from execFile
+to spawn also meant re-checking the two paths that hang off it: a non-zero exit
+still produces a `Command failed:` message carrying the tail of stderr, and an
+aborted run still surfaces as an AbortError, which is what tells the job that a
+stop was requested rather than a recording being bad.
+
 ## A job that fails on everything is not a success
 
 Pressing Transcribe in an installed build appeared to start and then stop: no
