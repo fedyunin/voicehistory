@@ -19,6 +19,8 @@ network access in the project is a one-time download of the speech model.
 Built against a real archive: **5,398 recordings, 505 hours, 2019–2026**,
 exported from [Cube ACR](https://cubeacr.app/) as 8 kHz AMR files.
 
+![A short tour: the archive overview, a day picked out of the activity map, one person's history, a conversation with its transcript, and a search across every word](docs/tour.gif)
+
 ![The window on opening: years, people and anything needing review on the left, calls in the middle, and the archive read as a whole on the right — this day in earlier years, what each year was about, hours a year, every day as a map, and who the time went to](docs/01-overview.png)
 
 <sub>Screenshots use a generated demo archive — invented people, invented
