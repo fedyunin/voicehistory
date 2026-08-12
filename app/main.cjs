@@ -119,6 +119,7 @@ const API = {
   archive: () => session.archiveState(),
 
   overview: () => stats.overview(),
+  onthisday: ({ day }) => stats.onThisDay(day || undefined),
   people: () => people(),
   person: ({ name }) => stats.person(name ?? '') ?? { error: 'no such person' },
   review: () => ({ reasons: review.counts() }),
@@ -271,7 +272,7 @@ const API = {
 
 /** Endpoints that make no sense until a folder is chosen. */
 const NEEDS_ARCHIVE = new Set([
-  'stats', 'overview', 'contacts', 'people', 'person', 'years', 'list', 'recording', 'import/scan', 'import/start',
+  'stats', 'overview', 'onthisday', 'contacts', 'people', 'person', 'years', 'list', 'recording', 'import/scan', 'import/start',
   'transcribe/start', 'reindex', 'contacts/rename', 'contacts/import', 'maintenance',
   'maintenance/run', 'backfill/props', 'settings/update', 'transcribe/again',
 ]);

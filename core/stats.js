@@ -123,3 +123,25 @@ export function person(name) {
     numbers: all(`SELECT c.key, COUNT(r.id) calls ${from} GROUP BY c.id ORDER BY calls DESC`),
   };
 }
+
+/**
+ * The same calendar day in earlier years.
+ *
+ * Cheap to compute and the one view that surfaces recordings nobody would think
+ * to search for: you cannot look up a conversation you have forgotten having.
+ *
+ * @param {string} [monthDay] 'MM-DD'; defaults to today in local time, because
+ *   the archive stores local timestamps as the phone recorded them.
+ */
+export function onThisDay(monthDay) {
+  const now = new Date();
+  const md = monthDay ?? `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const rows = open().prepare(`
+    SELECT r.id, r.started_at, r.duration_ms AS ms, r.transcript_status AS status,
+           c.display_name AS name
+    FROM recordings r LEFT JOIN contacts c ON c.id = r.contact_id
+    WHERE substr(r.started_at, 6, 5) = @md
+    ORDER BY r.started_at DESC
+  `).all({ md });
+  return { monthDay: md, rows };
+}

@@ -65,7 +65,7 @@ export function serve(port = 4321) {
 
 /** Endpoints that make no sense until a folder is chosen. */
 const NEEDS_ARCHIVE = new Set([
-  'stats', 'overview', 'contacts', 'people', 'person', 'years', 'list', 'recording', 'import/scan', 'import/start',
+  'stats', 'overview', 'onthisday', 'contacts', 'people', 'person', 'years', 'list', 'recording', 'import/scan', 'import/start',
   'transcribe/start', 'reindex', 'contacts/rename', 'contacts/import', 'maintenance',
   'maintenance/run', 'backfill/props', 'settings/update', 'transcribe/again',
 ]);
@@ -143,6 +143,9 @@ async function api(req, res, url) {
 
     case 'person':
       return json(res, 200, stats.person(q.get('name') ?? '') ?? { error: 'no such person' });
+
+    case 'onthisday':
+      return json(res, 200, stats.onThisDay(q.get('day') || undefined));
 
     case 'overview':
       return json(res, 200, stats.overview());

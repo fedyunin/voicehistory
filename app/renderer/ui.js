@@ -391,6 +391,30 @@ async function showOverview() {
     span,
   ].filter(Boolean).join(' · ')));
 
+  // Before the charts: this is the part worth reading today, and the only view
+  // that surfaces a conversation nobody would think to search for.
+  const today = await api.onThisDay().catch(() => null);
+  if (today?.rows?.length) {
+    const box = el('div', 'chart');
+    const when = new Date(`2000-${today.monthDay}T12:00:00`)
+      .toLocaleDateString(undefined, { day: 'numeric', month: 'long' });
+    box.append(el('h3', 'sect-title', `On this day · ${when}`));
+    for (const r of today.rows.slice(0, 8)) {
+      // Its own grid: the people rows put a bar in the middle column, and a bare
+      // year floating in that space reads as a mistake.
+      const row = el('div', 'day-row');
+      row.append(el('span', 'name', esc(r.name ?? 'Unknown number')));
+      row.append(el('span', 'muted tiny', r.started_at.slice(0, 4)));
+      row.append(el('span', 'person-n', fmtDur(r.ms)));
+      row.onclick = () => openRecording(r.id);
+      box.append(row);
+    }
+    if (today.rows.length > 8) {
+      box.append(el('div', 'muted tiny', `and ${today.rows.length - 8} more`));
+    }
+    d.append(box);
+  }
+
   d.append(bars(o.byYear, {
     title: 'Hours a year',
     value: (r) => r.ms,

@@ -391,3 +391,12 @@ button.linkish {
   border: 0; background: none; padding: 0; color: var(--accent);
   font: inherit; text-decoration: underline; cursor: pointer;
 }
+
+.day-row {
+  display: grid; grid-template-columns: 1fr auto auto;
+  gap: 12px; align-items: baseline;
+  padding: 4px 6px; border-radius: 7px; cursor: pointer; font-size: 13.5px;
+}
+.day-row:hover { background: var(--accent-soft); }
+.day-row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.day-row .person-n { color: var(--muted); font-variant-numeric: tabular-nums; }
