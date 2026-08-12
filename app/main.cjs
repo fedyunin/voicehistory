@@ -41,7 +41,7 @@ protocol.registerSchemesAsPrivileged([{
 let paths, abs, hasRoot, bus, progress, db, runner, lock, appsettings, session, archive, config,
     maintenance, list, recording, contacts, years,
     importFiles, transcribePending, retranscribe, scanInbox, backfillProps, reindex, modelAvailable,
-    vcardsToOverrides, choices, matchPlan, tools, models, abort;
+    vcardsToOverrides, choices, matchPlan, tools, models, abort, about;
 
 async function loadCore() {
   const m = async (p) => import(pathToFileURL(path.join(HERE, '..', 'core', p)).href);
@@ -63,6 +63,7 @@ async function loadCore() {
   ({ all: choices, matchPlan } = await m('choices.js'));
   tools = await m('tools.js');
   models = await m('models.js');
+  about = await m('about.js');
   abort = await m('abort.js');
 }
 
@@ -114,6 +115,20 @@ function startModelDownload() {
 const API = {
   /* --- archive --- */
   archive: () => session.archiveState(),
+
+  about: () => ({
+    ...about.info(),
+    shell: 'desktop',
+    // Only the desktop build has these, and they are the versions a bug report
+    // actually needs.
+    runtime: { ...about.info().runtime, electron: process.versions.electron, chrome: process.versions.chrome },
+  }),
+  /** Opens a link in the real browser; a renderer window must never become one. */
+  'open/external': ({ url }) => {
+    if (!/^https:\/\//.test(url ?? '')) return { ok: false };
+    shell.openExternal(url);
+    return { ok: true };
+  },
 
   setup: () => setupState(),
   'setup/model': () => {

@@ -51,7 +51,7 @@ const WRITES = new Set([
   'archive/open', 'archive/forget', 'archive/choose', 'settings/update',
   'import/start', 'transcribe/start', 'transcribe/again', 'reindex', 'cancel',
   'contacts/rename', 'contacts/import', 'maintenance/run', 'backfill/props',
-  'reveal/archive', 'setup/model',
+  'reveal/archive', 'setup/model', 'open/external',
 ]);
 
 const call = (method, args = {}) => {
@@ -85,6 +85,7 @@ export const api = {
   importVCard:     (vcard) => call('contacts/import', { vcard }),
   choices:         () => call('choices'),
   maintenance:     () => call('maintenance'),
+  about:           () => call('about'),
   setup:           () => call('setup'),
   setupModel:      () => call('setup/model'),
   maintenanceRun:  (action, confirm) => call('maintenance/run', { action, confirm }),
@@ -95,6 +96,9 @@ export const api = {
   /** A real folder picker. Returns {canceled} in the browser, where none exists. */
   chooseFolder: (mode) => (bridge ? call('archive/choose', { mode }) : Promise.resolve({ canceled: true, unsupported: true })),
   revealArchive: () => (bridge ? call('reveal/archive') : Promise.resolve({ ok: false })),
+
+  /** In a browser an ordinary link already does the right thing. */
+  openExternal: (url) => (bridge ? call('open/external', { url }) : Promise.resolve({ ok: false })),
 
   mediaUrl: (id) => (bridge ? bridge.mediaUrl(id) : `/media/${id}`),
 

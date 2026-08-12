@@ -20,6 +20,7 @@ import { reindex } from '../core/reindex.js';
 import { modelAvailable } from '../core/transcribe.js';
 import * as tools from '../core/tools.js';
 import * as models from '../core/models.js';
+import * as about from '../core/about.js';
 import * as abort from '../core/abort.js';
 import { vcardsToOverrides } from '../core/contactbook.js';
 import * as maintenance from '../core/maintenance.js';
@@ -134,6 +135,9 @@ async function api(req, res, url) {
   switch (p) {
     case 'archive':
       return json(res, 200, session.archiveState());
+
+    case 'about':
+      return json(res, 200, { ...about.info(), shell: 'browser' });
 
     case 'setup':
       return json(res, 200, await setupState());

@@ -526,7 +526,10 @@ function describeFolder(r) {
 /* ======================= settings ======================= */
 
 async function openSettings() {
-  const [{ usage, actions, config }, arch] = await Promise.all([api.maintenance(), api.archive()]);
+  const [{ usage, actions, config }, arch, about] = await Promise.all([
+    api.maintenance(), api.archive(), api.about().catch(() => null),
+  ]);
+  renderAbout(about);
 
   const u = $('set-usage');
   u.replaceChildren();
@@ -992,6 +995,62 @@ function showProgress({ kind, done = 0, total = 0, file, fileMs, startedAt, stop
 async function refreshAll({ keepPlace = false } = {}) {
   await Promise.all([refreshStats(), loadSidebar()]);
   await loadList(!keepPlace, keepPlace);
+}
+
+/**
+ * Which build this is, and where its pieces live.
+ *
+ * The version is the first thing any bug report needs and an installed app
+ * offers no other way to find it. The paths are here because the per-user model
+ * directory and the settings file are exactly what someone needs when something
+ * is missing, and neither is guessable.
+ */
+function renderAbout(about) {
+  const box = $('set-about');
+  box.replaceChildren();
+  if (!about) return;
+
+  const line = (label, v) => {
+    const row = el('div', 'usage-row');
+    row.append(el('span', 'muted', label), el('span', '', v));
+    box.append(row);
+  };
+  const r = about.runtime ?? {};
+  line('Version', `${about.name} ${about.version}`);
+  line('Running as', about.shell === 'desktop' ? 'desktop app' : 'in a browser');
+  // 'darwin' is what the runtime calls it, not what anyone else does.
+  const OS = { darwin: 'macOS', win32: 'Windows', linux: 'Linux' };
+  line('Platform', [OS[r.platform] ?? r.platform, r.arch].filter(Boolean).join(' · '));
+  line('Runtime', [r.electron && `Electron ${r.electron}`, r.node && `Node ${r.node}`]
+    .filter(Boolean).join(' · '));
+  line('Archive format', `version ${about.archiveFormat}`);
+  line('Speech model', about.model);
+  line('Models kept in', about.modelsWriteDir);
+  line('App settings', about.settingsFile);
+  line('License', about.license);
+
+  const link = (id, url) => {
+    $(id).onclick = guard(async () => {
+      // A renderer window must never navigate to the web, so the desktop build
+      // hands the URL to the real browser instead.
+      const r2 = await api.openExternal(url);
+      if (!r2?.ok) window.open(url, '_blank', 'noopener');
+    });
+  };
+  link('about-repo', about.repo);
+  link('about-releases', about.releases);
+
+  $('about-copy').onclick = guard(async () => {
+    // One click to paste into an issue, rather than retyping six lines.
+    await navigator.clipboard.writeText([
+      `${about.name} ${about.version}`,
+      `${about.shell} · ${OS[r.platform] ?? r.platform} ${r.arch}`,
+      r.electron ? `Electron ${r.electron} · Node ${r.node}` : `Node ${r.node}`,
+      `archive format ${about.archiveFormat} · model ${about.model}`,
+    ].join('\n'));
+    $('about-copied').textContent = 'Copied';
+    setTimeout(() => { $('about-copied').textContent = ''; }, 1500);
+  });
 }
 
 /* ======================= requirements ======================= */
