@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice History — a local archive for recorded phone calls</title>
+<meta name="description" content="Files years of call recordings by date, transcribes them locally with whisper.cpp, and turns them into something you can search, read and listen back to. Nothing leaves your machine.">
+
+<!-- Same palette as the app, and the same rule: no build step, no framework. -->
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fbfaf8; --panel: #fff; --line: #e6e2db; --ink: #1f1d1a;
+    --muted: #8b857c; --accent: #9a5b3f; --accent-soft: #f4e8e2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #171614; --panel: #1f1e1b; --line: #322f2a; --ink: #ebe7e0;
+      --muted: #8f887d; --accent: #d08c6a; --accent-soft: #33261f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 0 20px 80px; }
+  a { color: var(--accent); }
+  h1 { font-size: 40px; line-height: 1.15; margin: 54px 0 8px; letter-spacing: -.02em; }
+  h2 { font-size: 22px; margin: 52px 0 10px; }
+  .lede { font-size: 20px; color: var(--muted); margin: 0 0 4px; max-width: 40em; }
+  .brand { display: flex; align-items: center; gap: 9px; padding-top: 34px; font-weight: 600; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+  img { max-width: 100%; border: 1px solid var(--line); border-radius: 10px; display: block; }
+  figure { margin: 0; }
+  figcaption { color: var(--muted); font-size: 14px; padding: 8px 2px 0; }
+  .shots { display: grid; gap: 22px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top: 18px; }
+  .facts { display: flex; flex-wrap: wrap; gap: 8px 26px; color: var(--muted); font-size: 15px; margin: 18px 0 0; }
+  .dl { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0 10px; }
+  .dl a {
+    display: inline-block; padding: 11px 16px; border-radius: 9px;
+    background: var(--accent); color: #fff; text-decoration: none; font-size: 15px; font-weight: 550;
+  }
+  .dl a.alt { background: var(--panel); color: var(--ink); border: 1px solid var(--line); font-weight: 400; }
+  .dl a:hover { filter: brightness(1.08); }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .88em;
+    background: var(--accent-soft); padding: 2px 5px; border-radius: 4px;
+  }
+  pre {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 16px; overflow-x: auto; font-size: 14px;
+  }
+  pre code { background: none; padding: 0; }
+  .note { color: var(--muted); font-size: 15px; }
+  footer { border-top: 1px solid var(--line); margin-top: 60px; padding-top: 20px; color: var(--muted); font-size: 15px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="brand"><span class="dot"></span> Voice History</div>
+
+  <h1>Years of phone calls, worth keeping.</h1>
+  <p class="lede">Point it at a folder of call-recorder exports. It files them by date,
+    transcribes the speech on your own machine, and turns the pile into something you can
+    search, read and listen back to.</p>
+
+  <p class="facts">
+    <span>Nothing leaves your machine</span>
+    <span>macOS · Windows · Linux</span>
+    <span>MIT</span>
+    <span>No account, no server, no cloud</span>
+  </p>
+
+  <div class="dl">
+    <a href="https://github.com/fedyunin/voicehistory/releases/latest/download/VoiceHistory-mac-arm64.dmg">macOS — Apple Silicon</a>
+    <a href="https://github.com/fedyunin/voicehistory/releases/latest/download/VoiceHistory-mac-x64.dmg">macOS — Intel</a>
+    <a href="https://github.com/fedyunin/voicehistory/releases/latest/download/VoiceHistory-win-x64-setup.exe">Windows</a>
+    <a href="https://github.com/fedyunin/voicehistory/releases/latest/download/VoiceHistory-linux-x86_64.AppImage">Linux — AppImage</a>
+    <a class="alt" href="https://github.com/fedyunin/voicehistory">Source on GitHub</a>
+  </div>
+  <p class="note">Builds are unsigned, so the first launch needs a nudge: on macOS right-click → Open;
+    on Windows <em>More info</em> → <em>Run anyway</em>. They expect
+    <code>ffmpeg</code> and <code>whisper-cli</code> installed — the app checks on
+    launch and says what to run.</p>
+
+  <figure style="margin-top:38px">
+    <img src="01-overview.png" alt="The app on opening: years, people and anything needing review on the left, the call list in the middle, and on the right the archive read as a whole — this day in earlier years, what each year was about, hours a year, every day as a map, and who the time went to.">
+    <figcaption>It opens on the archive itself, not an empty pane.</figcaption>
+  </figure>
+
+  <h2>It reads the years back to you</h2>
+  <p>Hours a year, so a quiet stretch is visible as one. Every day as a map, where a
+    pale year is a pale year. Who your time actually went to — ranked by hours, not by
+    number of calls, or a bank's notifications would outrank a parent. And what each
+    year was about, drawn from the transcripts: not the commonest words, which are
+    <em>yes</em> and <em>well</em> in every year alike, but the ones that stand out
+    against everything else recorded.</p>
+
+  <div class="shots">
+    <figure>
+      <img src="02-person.png" alt="One person: calls, hours and years together, the words that stand out in their conversations, their days as a map, and their longest calls.">
+      <figcaption>One person, across every number they ever called from.</figcaption>
+    </figure>
+    <figure>
+      <img src="04-search.png" alt="Search results across every transcript, each showing the matching phrase highlighted in context.">
+      <figcaption>Search every word ever said, then click the line to hear it.</figcaption>
+    </figure>
+  </div>
+
+  <h2>And admits what it got wrong</h2>
+  <p>Speech recognition does not fail loudly. For a recording it made nothing of, it
+    returns one plausible line as readily as a real transcript — a stage direction, or
+    a single phrase for an hour of talking. The archive points at those instead of
+    leaving them to be found by scrolling, and offers to run them again.</p>
+
+  <div class="shots">
+    <figure>
+      <img src="05-review.png" alt="The list narrowed to recordings whose transcription looks doubtful, with a chip naming the reason and a button to re-run all of them.">
+      <figcaption>Found by shape, not by luck.</figcaption>
+    </figure>
+    <figure>
+      <img src="03-archive.png" alt="A call open, with its player at the top and the transcript below; each line is a click from that moment in the audio.">
+      <figcaption>Every transcript line is a click from that moment.</figcaption>
+    </figure>
+  </div>
+
+  <h2>Your archive is a folder</h2>
+  <p>Anywhere you like, including an external drive. It holds the recordings, the
+    transcripts and the search index, and nothing else — no copy is kept elsewhere.
+    Move the folder and the archive moves with it. Files are the source of truth and
+    the database is derived from them, so it can be rebuilt from scratch at any time
+    and an indexing bug cannot cost you anything.</p>
+
+  <pre><code>&lt;your archive&gt;/
+  archive.json              format version and settings, travelling with the data
+  recordings/2026/2026-07/  originals, filed by month
+  audio/2026/2026-07/       playable copies — no browser plays AMR
+  transcripts/2026/2026-07/ raw model output
+  contacts.json             names you assigned
+  index.sqlite              search index — derived, rebuildable</code></pre>
+
+  <h2>Run it from source instead</h2>
+  <pre><code>git clone https://github.com/fedyunin/voicehistory.git
+cd voicehistory
+npm install
+npm run app</code></pre>
+  <p class="note">Node 20+, ffmpeg and whisper.cpp. On macOS:
+    <code>brew install ffmpeg whisper-cpp</code>. The app downloads the speech model itself.</p>
+
+  <h2>Built against a real archive</h2>
+  <p>5,398 recordings, 505 hours, 2019–2026, exported from a phone as 8 kHz AMR. Almost
+    nothing about making that work was predictable from documentation: why the recognizer
+    needs a priming prompt before it will produce punctuation at all, why normalizing
+    audio helps damaged recordings and hurts healthy ones, why silent files have to be
+    detected before transcription rather than after, and why one day with 98 calls ruins
+    a colour scale for the other 1,611.</p>
+  <p><a href="https://github.com/fedyunin/voicehistory/blob/main/docs/ENGINEERING.md">Engineering notes →</a>
+    every finding, with the measurement behind it.</p>
+
+  <footer>
+    <p>Voice History is free software under the MIT licence, by
+      <a href="https://github.com/fedyunin">Alexey Fedyunin</a>.
+      <a href="https://github.com/fedyunin/voicehistory">Source</a> ·
+      <a href="https://github.com/fedyunin/voicehistory/releases">Releases</a> ·
+      <a href="https://github.com/fedyunin/voicehistory/issues">Issues</a></p>
+    <p>Call recordings are sensitive, and in many places recording a call requires the
+      consent of both parties. This is a tool for organizing recordings you already have
+      and are entitled to keep.</p>
+  </footer>
+
+</div>
+</body>
+</html>
