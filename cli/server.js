@@ -14,7 +14,7 @@ import * as db from '../core/db.js';
 import * as runner from '../core/runner.js';
 import * as lock from '../core/lock.js';
 import * as appsettings from '../core/appsettings.js';
-import { list, recording, contacts, years } from '../core/search.js';
+import { list, recording, contacts, people, years } from '../core/search.js';
 import { importFiles, transcribePending, retranscribe, scanInbox, backfillProps } from '../core/ingest.js';
 import { reindex } from '../core/reindex.js';
 import { modelAvailable } from '../core/transcribe.js';
@@ -65,7 +65,7 @@ export function serve(port = 4321) {
 
 /** Endpoints that make no sense until a folder is chosen. */
 const NEEDS_ARCHIVE = new Set([
-  'stats', 'overview', 'contacts', 'years', 'list', 'recording', 'import/scan', 'import/start',
+  'stats', 'overview', 'contacts', 'people', 'person', 'years', 'list', 'recording', 'import/scan', 'import/start',
   'transcribe/start', 'reindex', 'contacts/rename', 'contacts/import', 'maintenance',
   'maintenance/run', 'backfill/props', 'settings/update', 'transcribe/again',
 ]);
@@ -138,6 +138,12 @@ async function api(req, res, url) {
     case 'archive':
       return json(res, 200, session.archiveState());
 
+    case 'people':
+      return json(res, 200, people());
+
+    case 'person':
+      return json(res, 200, stats.person(q.get('name') ?? '') ?? { error: 'no such person' });
+
     case 'overview':
       return json(res, 200, stats.overview());
 
@@ -207,6 +213,7 @@ async function api(req, res, url) {
         contactId: q.get('contact') ? Number(q.get('contact')) : null,
         year: q.get('year') || null,
         source: q.get('source') || null,
+        contactName: q.get('contactName') || null,
         review: q.get('review') || null,
         offset: Number(q.get('offset') ?? 0),
         limit: Number(q.get('limit') ?? 60),

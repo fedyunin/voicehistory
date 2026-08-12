@@ -89,3 +89,37 @@ export function overview() {
     `),
   };
 }
+
+/**
+ * One person, across every number they have used.
+ *
+ * The shape of a relationship rather than a leaderboard: when it started, when
+ * it was last, how it rose and fell year by year, and the single longest
+ * conversation — which is usually the one worth listening to again.
+ */
+export function person(name) {
+  const d = open();
+  const args = { name };
+  const one = (sql) => d.prepare(sql).get(args);
+  const all = (sql) => d.prepare(sql).all(args);
+  const from = `FROM recordings r JOIN contacts c ON c.id = r.contact_id WHERE c.display_name = @name`;
+
+  const totals = one(`
+    SELECT COUNT(*) calls, COALESCE(SUM(r.duration_ms), 0) ms,
+           MIN(r.started_at) first, MAX(r.started_at) last,
+           COUNT(DISTINCT c.id) numbers,
+           COALESCE(AVG(r.duration_ms), 0) avgMs
+    ${from}
+  `);
+  if (!totals.calls) return null;
+
+  return {
+    name,
+    totals,
+    byYear: all(`SELECT substr(r.started_at,1,4) year, COUNT(*) calls, SUM(r.duration_ms) ms ${from} GROUP BY year ORDER BY year`),
+    byHour: all(`SELECT CAST(substr(r.started_at,12,2) AS INTEGER) hour, COUNT(*) calls, SUM(r.duration_ms) ms ${from} GROUP BY hour ORDER BY hour`),
+    byDirection: all(`SELECT COALESCE(r.direction,'unknown') direction, COUNT(*) calls ${from} GROUP BY direction`),
+    longest: all(`SELECT r.id, r.duration_ms ms, r.started_at ${from} ORDER BY r.duration_ms DESC LIMIT 3`),
+    numbers: all(`SELECT c.key, COUNT(r.id) calls ${from} GROUP BY c.id ORDER BY calls DESC`),
+  };
+}

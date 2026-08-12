@@ -310,6 +310,22 @@ means distributing someone else's software under GPL/LGPL obligations, from
 sources that differ per platform, with checksums to verify. That is an installer,
 not a feature.
 
+## One person, across their numbers
+
+Selecting a name now shows the relationship rather than only its calls: how long
+it has run, how it rose and fell year by year, when in the day it happens, and
+the longest conversations, each a click from being played.
+
+It forced the sidebar to change unit. It listed one row per number, so "Мама"
+appeared twice — 1,643 calls and 240 — while the overview said 1,897. Three
+numbers in one window claiming to describe the same person is not a display
+detail; one of them is wrong. The sidebar now groups by name and filtering
+follows the person across every number they have called from.
+
+`contacts()` stays per-number, because the People dialog edits names for
+numbers, which is the right unit there. Two queries, two units, each matching
+what its screen is actually about.
+
 ## Seven years read at once
 
 The pane on the right said "pick a recording" until somebody did. It now opens

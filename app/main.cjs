@@ -39,7 +39,7 @@ protocol.registerSchemesAsPrivileged([{
 
 // Filled by loadCore() before any window exists.
 let paths, abs, hasRoot, bus, progress, db, runner, lock, appsettings, session, archive, config,
-    maintenance, list, recording, contacts, years,
+    maintenance, list, recording, contacts, people, years,
     importFiles, transcribePending, retranscribe, scanInbox, backfillProps, reindex, modelAvailable,
     vcardsToOverrides, choices, matchPlan, tools, models, abort, about, review, stats;
 
@@ -55,7 +55,7 @@ async function loadCore() {
   archive = await m('archive.js');
   config = await m('config.js');
   maintenance = await m('maintenance.js');
-  ({ list, recording, contacts, years } = await m('search.js'));
+  ({ list, recording, contacts, people, years } = await m('search.js'));
   ({ importFiles, transcribePending, retranscribe, scanInbox, backfillProps } = await m('ingest.js'));
   ({ reindex } = await m('reindex.js'));
   ({ modelAvailable } = await m('transcribe.js'));
@@ -119,6 +119,8 @@ const API = {
   archive: () => session.archiveState(),
 
   overview: () => stats.overview(),
+  people: () => people(),
+  person: ({ name }) => stats.person(name ?? '') ?? { error: 'no such person' },
   review: () => ({ reasons: review.counts() }),
 
   about: () => ({
@@ -181,6 +183,7 @@ const API = {
     contactId: p.contact ? Number(p.contact) : null,
     year: p.year || null,
     source: p.source || null,
+    contactName: p.contactName || null,
     review: p.review || null,
     offset: Number(p.offset ?? 0),
     limit: Number(p.limit ?? 60),
@@ -268,7 +271,7 @@ const API = {
 
 /** Endpoints that make no sense until a folder is chosen. */
 const NEEDS_ARCHIVE = new Set([
-  'stats', 'overview', 'contacts', 'years', 'list', 'recording', 'import/scan', 'import/start',
+  'stats', 'overview', 'contacts', 'people', 'person', 'years', 'list', 'recording', 'import/scan', 'import/start',
   'transcribe/start', 'reindex', 'contacts/rename', 'contacts/import', 'maintenance',
   'maintenance/run', 'backfill/props', 'settings/update', 'transcribe/again',
 ]);

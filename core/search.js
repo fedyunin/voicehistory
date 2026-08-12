@@ -24,6 +24,29 @@ export function contacts() {
   return rows;
 }
 
+/**
+ * The sidebar's list: one row per PERSON, not per number.
+ *
+ * contacts() stays as it is because the People dialog edits names per number,
+ * which is the right unit there. Here the right unit is the person: "Мама" is
+ * four numbers and 1,897 calls, and showing that as four rows made the sidebar
+ * disagree with the archive overview about who you talk to most.
+ */
+export function people() {
+  return open().prepare(`
+    SELECT c.display_name AS name,
+           COUNT(r.id) AS calls,
+           COALESCE(SUM(r.duration_ms), 0) AS total_ms,
+           COUNT(DISTINCT c.id) AS numbers,
+           MIN(r.started_at) AS first_call,
+           MAX(r.started_at) AS last_call
+    FROM contacts c JOIN recordings r ON r.contact_id = c.id
+    WHERE c.display_name IS NOT NULL
+    GROUP BY c.display_name
+    ORDER BY calls DESC
+  `).all();
+}
+
 export function years() {
   return open().prepare(`
     SELECT substr(started_at, 1, 4) AS year, COUNT(*) AS calls,
@@ -36,11 +59,13 @@ export function years() {
  * Recording list with filters. When q is present the query goes through FTS5
  * and each row carries a highlighted snippet.
  */
-export function list({ q = '', contactId = null, year = null, source = null, review = null, offset = 0, limit = PAGE } = {}) {
+export function list({ q = '', contactId = null, contactName = null, year = null, source = null, review = null, offset = 0, limit = PAGE } = {}) {
   const d = open();
   const where = [];
   const args = {};
   if (contactId) { where.push('r.contact_id = @contactId'); args.contactId = contactId; }
+  // By name, so selecting a person brings every number they have ever called from.
+  if (contactName) { where.push('c.display_name = @contactName'); args.contactName = contactName; }
   if (year) { where.push("substr(r.started_at,1,4) = @year"); args.year = String(year); }
   if (source) { where.push('r.source = @source'); args.source = source; }
   // Doubtful recordings are a filter over the same list rather than a screen of

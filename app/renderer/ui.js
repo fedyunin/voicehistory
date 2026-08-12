@@ -85,7 +85,7 @@ async function refreshStats() {
 }
 
 async function loadSidebar() {
-  const [ys, cs, rev] = await Promise.all([api.years(), api.contacts(), api.review().catch(() => null)]);
+  const [ys, cs, rev] = await Promise.all([api.years(), api.people(), api.review().catch(() => null)]);
 
   // Recognition does not fail loudly: it returns one line for an hour of speech
   // as readily as a real transcript. Nobody finds those by scrolling 5,000
@@ -117,10 +117,17 @@ async function loadSidebar() {
   const cl = $('contacts');
   cl.replaceChildren();
   for (const c of cs.slice(0, 120)) {
-    const li = el('li', state.contactId === c.id ? 'on' : '');
-    li.title = `${c.display_name} — ${c.calls} calls, ${fmtDur(c.total_ms)}`;
-    li.append(el('span', 'name', c.display_name), el('span', 'n', c.calls));
-    li.onclick = () => { state.contactId = state.contactId === c.id ? null : c.id; state.contactName = state.contactId ? c.display_name : null; refilter(); };
+    const li = el('li', state.contactName === c.name ? 'on' : '');
+    li.title = `${c.name} — ${c.calls} calls, ${fmtDur(c.total_ms)}`
+      + (c.numbers > 1 ? `, across ${c.numbers} numbers` : '');
+    li.append(el('span', 'name', c.name), el('span', 'n', c.calls));
+    li.onclick = () => {
+      state.contactName = state.contactName === c.name ? null : c.name;
+      refilter();
+      // Selecting a person shows who they are, not just their calls. Deselecting
+      // goes back to the archive as a whole.
+      if (state.contactName) showPerson(state.contactName); else showOverview();
+    };
     cl.append(li);
   }
 }
@@ -150,10 +157,10 @@ function renderFilters() {
 
   const active = [];
   if (state.year) active.push({ label: state.year, clear: () => { state.year = null; } });
-  if (state.contactId) {
+  if (state.contactName) {
     active.push({
-      label: state.contactName ?? 'selected person',
-      clear: () => { state.contactId = null; state.contactName = null; },
+      label: state.contactName,
+      clear: () => { state.contactName = null; },
     });
   }
   if (state.q) active.push({ label: `“${state.q}”`, clear: () => { $('q').value = ''; state.q = ''; } });
@@ -218,7 +225,7 @@ async function loadList(reset, keepPlace = false) {
 
   const r = await api.list({
     q: state.q,
-    contact: state.contactId,
+    contactName: state.contactName,
     year: state.year,
     review: state.review,
     offset: keepPlace ? 0 : state.offset,
@@ -299,6 +306,67 @@ function bars(rows, { value, label, title, format }) {
   }
   box.append(grid);
   return box;
+}
+
+/** One person: how long you have known them, and the shape of it year by year. */
+async function showPerson(name) {
+  const p = await api.person(name).catch(() => null);
+  const d = $('detail');
+  if (!p || p.error) return;
+  state.currentId = null;
+  for (const li of $('calls').children) li.classList.remove('on');
+
+  d.replaceChildren();
+  d.append(el('h2', '', esc(p.name)));
+
+  const t = p.totals;
+  const years = t.first && t.last
+    ? Math.max(1, Math.round((Date.parse(t.last) - Date.parse(t.first)) / 31557600000))
+    : 0;
+  d.append(el('div', 'sub', [
+    `${t.calls.toLocaleString()} calls`,
+    fmtDur(t.ms),
+    years ? `over ${years} year${years > 1 ? 's' : ''}` : '',
+    t.numbers > 1 ? `${t.numbers} numbers` : '',
+  ].filter(Boolean).join(' · ')));
+
+  d.append(el('div', 'muted tiny', `First ${fmtMonthYear(t.first)} · last ${fmtMonthYear(t.last)}`
+    + ` · usually ${fmtDur(Math.round(t.avgMs))}`));
+
+  d.append(bars(p.byYear, {
+    title: 'Hours a year together',
+    value: (r) => r.ms,
+    label: (r) => r.year,
+    format: (v) => fmtDur(v),
+  }));
+
+  if (p.byHour.length > 1) {
+    d.append(bars(p.byHour, {
+      title: 'When you talk',
+      value: (r) => r.ms,
+      label: (r) => (r.hour % 6 === 0 ? String(r.hour) : ''),
+      format: (v) => fmtDur(v),
+    }));
+  }
+
+  const dir = Object.fromEntries(p.byDirection.map((x) => [x.direction, x.calls]));
+  const foot = [];
+  if (dir.Incoming) foot.push(`${dir.Incoming.toLocaleString()} incoming`);
+  if (dir.Outgoing) foot.push(`${dir.Outgoing.toLocaleString()} outgoing`);
+  if (foot.length) d.append(el('div', 'muted tiny', foot.join(' · ')));
+
+  if (p.longest.length) {
+    const box = el('div', 'chart');
+    box.append(el('h3', 'sect-title', 'Longest conversations'));
+    for (const r of p.longest) {
+      const row = el('div', 'person-row');
+      row.append(el('span', 'name', fmtWhenFull(r.started_at)));
+      row.append(el('span', ''), el('span', 'person-n', fmtDur(r.ms)));
+      row.onclick = () => openRecording(r.id);
+      box.append(row);
+    }
+    d.append(box);
+  }
 }
 
 async function showOverview() {
