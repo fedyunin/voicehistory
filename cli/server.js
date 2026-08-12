@@ -22,6 +22,7 @@ import * as tools from '../core/tools.js';
 import * as models from '../core/models.js';
 import * as about from '../core/about.js';
 import * as review from '../core/review.js';
+import * as stats from '../core/stats.js';
 import * as abort from '../core/abort.js';
 import { vcardsToOverrides } from '../core/contactbook.js';
 import * as maintenance from '../core/maintenance.js';
@@ -64,7 +65,7 @@ export function serve(port = 4321) {
 
 /** Endpoints that make no sense until a folder is chosen. */
 const NEEDS_ARCHIVE = new Set([
-  'stats', 'contacts', 'years', 'list', 'recording', 'import/scan', 'import/start',
+  'stats', 'overview', 'contacts', 'years', 'list', 'recording', 'import/scan', 'import/start',
   'transcribe/start', 'reindex', 'contacts/rename', 'contacts/import', 'maintenance',
   'maintenance/run', 'backfill/props', 'settings/update', 'transcribe/again',
 ]);
@@ -136,6 +137,9 @@ async function api(req, res, url) {
   switch (p) {
     case 'archive':
       return json(res, 200, session.archiveState());
+
+    case 'overview':
+      return json(res, 200, stats.overview());
 
     case 'review':
       return json(res, 200, { reasons: review.counts() });

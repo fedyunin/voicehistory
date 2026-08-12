@@ -85,6 +85,7 @@ export const api = {
   importVCard:     (vcard) => call('contacts/import', { vcard }),
   choices:         () => call('choices'),
   maintenance:     () => call('maintenance'),
+  overview:        () => call('overview'),
   review:          () => call('review'),
   about:           () => call('about'),
   setup:           () => call('setup'),

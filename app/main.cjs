@@ -41,7 +41,7 @@ protocol.registerSchemesAsPrivileged([{
 let paths, abs, hasRoot, bus, progress, db, runner, lock, appsettings, session, archive, config,
     maintenance, list, recording, contacts, years,
     importFiles, transcribePending, retranscribe, scanInbox, backfillProps, reindex, modelAvailable,
-    vcardsToOverrides, choices, matchPlan, tools, models, abort, about, review;
+    vcardsToOverrides, choices, matchPlan, tools, models, abort, about, review, stats;
 
 async function loadCore() {
   const m = async (p) => import(pathToFileURL(path.join(HERE, '..', 'core', p)).href);
@@ -65,6 +65,7 @@ async function loadCore() {
   models = await m('models.js');
   about = await m('about.js');
   review = await m('review.js');
+  stats = await m('stats.js');
   abort = await m('abort.js');
 }
 
@@ -117,6 +118,7 @@ const API = {
   /* --- archive --- */
   archive: () => session.archiveState(),
 
+  overview: () => stats.overview(),
   review: () => ({ reasons: review.counts() }),
 
   about: () => ({
@@ -266,7 +268,7 @@ const API = {
 
 /** Endpoints that make no sense until a folder is chosen. */
 const NEEDS_ARCHIVE = new Set([
-  'stats', 'contacts', 'years', 'list', 'recording', 'import/scan', 'import/start',
+  'stats', 'overview', 'contacts', 'years', 'list', 'recording', 'import/scan', 'import/start',
   'transcribe/start', 'reindex', 'contacts/rename', 'contacts/import', 'maintenance',
   'maintenance/run', 'backfill/props', 'settings/update', 'transcribe/again',
 ]);

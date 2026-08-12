@@ -355,3 +355,39 @@ dialog.wide-dlg { max-width: 660px; }
   font-size: 12px;
   overflow-wrap: anywhere;
 }
+
+/* ---------------- archive overview ---------------- */
+
+.brand { cursor: pointer; }
+.chart { margin: 22px 0 6px; }
+.chart-bars {
+  display: flex; align-items: flex-end; gap: 4px;
+  height: 110px; padding-top: 6px;
+}
+.chart-bar {
+  flex: 1; display: flex; flex-direction: column; justify-content: flex-end;
+  height: 100%; min-width: 0;
+}
+.chart-fill { background: var(--accent); border-radius: 3px 3px 0 0; opacity: .85; }
+.chart-bar:hover .chart-fill { opacity: 1; }
+.chart-label {
+  font-size: 10.5px; color: var(--muted); text-align: center;
+  padding-top: 4px; white-space: nowrap; overflow: hidden;
+}
+
+.person-row {
+  display: grid; grid-template-columns: minmax(90px, 1fr) 2fr auto;
+  gap: 10px; align-items: center;
+  padding: 4px 6px; border-radius: 7px; cursor: pointer; font-size: 13.5px;
+}
+.person-row:hover { background: var(--accent-soft); }
+.person-row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.person-track { height: 7px; background: var(--line); border-radius: 4px; overflow: hidden; }
+.person-fill { display: block; height: 100%; background: var(--accent); }
+.person-n { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.longest { margin-top: 8px; }
+button.linkish {
+  border: 0; background: none; padding: 0; color: var(--accent);
+  font: inherit; text-decoration: underline; cursor: pointer;
+}

@@ -364,7 +364,14 @@ export function stats() {
   const one = (sql) => d.prepare(sql).get();
   return {
     recordings: one('SELECT COUNT(*) n FROM recordings').n,
-    contacts: one('SELECT COUNT(*) n FROM contacts').n,
+    // Distinct PEOPLE, not contact rows. One person routinely has several
+    // numbers — four for the same "Мама" in the archive this was built against —
+    // and counting rows made the footer and the overview disagree about how many
+    // people are in the same archive.
+    contacts: one(`SELECT COUNT(*) n FROM (
+      SELECT DISTINCT c.display_name FROM contacts c
+      JOIN recordings r ON r.contact_id = c.id
+      WHERE c.display_name IS NOT NULL)`).n,
     totalMs: one('SELECT COALESCE(SUM(duration_ms),0) n FROM recordings').n,
     byStatus: d.prepare('SELECT transcript_status s, COUNT(*) n FROM recordings GROUP BY 1').all(),
     years: d.prepare(`SELECT substr(started_at,1,4) y, COUNT(*) n FROM recordings GROUP BY 1 ORDER BY 1`).all(),

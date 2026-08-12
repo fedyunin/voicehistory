@@ -30,6 +30,10 @@ async function boot() {
   await loadList(true);
   wire();
 
+  // The pane on the right would otherwise say "pick a recording" for as long as
+  // nobody has. Seven years of calls have something to say on their own.
+  await showOverview();
+
   // Checked after the list is up, not before: a missing recognizer does not stop
   // anyone from reading transcripts that already exist, so it must not stand in
   // the way of opening the archive.
@@ -268,6 +272,118 @@ function callRow(row) {
   return li;
 }
 
+/* ======================= the archive as a whole ======================= */
+
+/**
+ * Seven years read at once, in the pane that otherwise says "pick a recording".
+ *
+ * Charts are hand-drawn SVG. There is no build step in this project and adding
+ * one for four bar charts would be a poor trade — and inline SVG inherits the
+ * palette, so it follows the light/dark setting for free.
+ */
+function bars(rows, { value, label, title, format }) {
+  const max = Math.max(...rows.map(value), 1);
+  const box = el('div', 'chart');
+  box.append(el('h3', 'sect-title', title));
+  const grid = el('div', 'chart-bars');
+  for (const row of rows) {
+    const v = value(row);
+    const bar = el('div', 'chart-bar');
+    bar.title = `${label(row)} — ${format(v)}`;
+    const fill = el('div', 'chart-fill');
+    // A minimum height so an empty period still reads as a labelled column
+    // rather than a gap in the axis.
+    fill.style.height = `${Math.max(2, (v / max) * 100)}%`;
+    bar.append(fill, el('span', 'chart-label', label(row)));
+    grid.append(bar);
+  }
+  box.append(grid);
+  return box;
+}
+
+async function showOverview() {
+  const o = await api.overview().catch(() => null);
+  const d = $('detail');
+  if (!o) return;
+  state.currentId = null;
+  history.replaceState(null, '', '#');
+  for (const li of $('calls').children) li.classList.remove('on');
+
+  d.replaceChildren();
+  d.append(el('h2', '', 'Your archive'));
+
+  const t = o.totals;
+  const span = t.first && t.last
+    ? `${fmtMonthYear(t.first)} — ${fmtMonthYear(t.last)}`
+    : '';
+  d.append(el('div', 'sub', [
+    `${t.recordings.toLocaleString()} recordings`,
+    fmtDur(t.ms),
+    `${t.people} people`,
+    span,
+  ].filter(Boolean).join(' · ')));
+
+  d.append(bars(o.byYear, {
+    title: 'Hours a year',
+    value: (r) => r.ms,
+    label: (r) => r.year,
+    format: (v) => fmtDur(v),
+  }));
+
+  // Ranked by time rather than by number of calls: 2,315 recordings under a
+  // minute account for 17 hours, while 33 over an hour account for 49. Counting
+  // calls would put a bank's notifications above a parent.
+  const people = el('div', 'chart');
+  people.append(el('h3', 'sect-title', 'Most time spent with'));
+  const maxMs = Math.max(...o.topPeople.map((p) => p.ms), 1);
+  for (const p of o.topPeople) {
+    const row = el('div', 'person-row');
+    row.append(el('span', 'name', esc(p.name)));
+    const track = el('span', 'person-track');
+    const fill = el('span', 'person-fill');
+    fill.style.width = `${(p.ms / maxMs) * 100}%`;
+    track.append(fill);
+    row.append(track, el('span', 'person-n', fmtDur(p.ms)));
+    row.title = `${p.calls} calls${p.numbers > 1 ? ` across ${p.numbers} numbers` : ''}`
+      + ` · ${fmtMonthYear(p.first)} — ${fmtMonthYear(p.last)}`;
+    row.onclick = () => {
+      const c = document.querySelectorAll('#contacts li');
+      for (const li of c) if (li.textContent.startsWith(p.name)) { li.click(); return; }
+    };
+    people.append(row);
+  }
+  d.append(people);
+
+  d.append(bars(o.byHour, {
+    title: 'When calls happen',
+    value: (r) => r.ms,
+    label: (r) => (r.hour % 6 === 0 ? String(r.hour) : ''),
+    format: (v) => fmtDur(v),
+  }));
+
+  const dir = Object.fromEntries(o.byDirection.map((x) => [x.direction, x.calls]));
+  const foot = [];
+  if (dir.Incoming) foot.push(`${dir.Incoming.toLocaleString()} incoming`);
+  if (dir.Outgoing) foot.push(`${dir.Outgoing.toLocaleString()} outgoing`);
+  if (dir.unknown) foot.push(`${dir.unknown.toLocaleString()} without a direction recorded`);
+  d.append(el('div', 'muted tiny', foot.join(' · ')));
+
+  const longest = o.longest?.[0];
+  if (longest) {
+    const line = el('div', 'muted tiny longest');
+    line.append(document.createTextNode('Longest conversation: '));
+    const a = el('button', 'linkish', `${fmtDur(longest.ms)} with ${esc(longest.name ?? 'unknown')}`);
+    a.onclick = () => openRecording(longest.id);
+    line.append(a);
+    d.append(line);
+  }
+}
+
+function fmtMonthYear(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+}
+
 /* ======================= detail pane ======================= */
 
 const NO_TRANSCRIPT = {
@@ -451,6 +567,10 @@ function wire() {
   }
 
   $('btn-jobs').onclick = guard(async () => { await refreshStats(); $('dlg-jobs').showModal(); });
+
+  // Clicking the name goes back to the archive as a whole — the only way back
+  // out of a recording, and where people already reach for "home".
+  document.querySelector('.brand').onclick = guard(() => showOverview());
 
   $('btn-setup').onclick = guard(async () => { await loadSetup(); $('dlg-setup').showModal(); });
   $('setup-close').onclick = () => $('dlg-setup').close();

@@ -310,6 +310,31 @@ means distributing someone else's software under GPL/LGPL obligations, from
 sources that differ per platform, with checksums to verify. That is an installer,
 not a feature.
 
+## Seven years read at once
+
+The pane on the right said "pick a recording" until somebody did. It now opens
+on the archive as a whole: hours a year, who the time went to, when calls
+happen, incoming against outgoing, the longest conversation.
+
+Two decisions carry it.
+
+**People are grouped by name, not by contact row.** One person routinely has
+several numbers — "Мама" is four of them and 1,897 calls here — so counting rows
+would file a third of a relationship under a separate heading. The same
+definition now backs the footer, which used to count contact rows and disagreed
+with the overview about how many people were in the same archive.
+
+**Ranking is by time, not by number of calls.** 2,315 recordings under a minute
+account for 17 hours; 33 over an hour account for 49. Ranked by count, a bank's
+notifications outrank a parent.
+
+The charts are hand-drawn from divs and CSS. There is no build step in this
+project, and adding one for four bar charts would be a poor trade — and markup
+inherits the palette, so light and dark come free.
+
+Nothing is cached. The whole thing is one pass over 5,398 rows, and a number
+that is always current is worth more than one that is fast.
+
 ## Finding what recognition got wrong
 
 Recognition does not fail loudly. For a recording it made nothing of it returns
