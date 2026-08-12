@@ -1,6 +1,6 @@
 {
   "name": "voicehistory",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Local-first archive for recorded phone calls: imports Cube ACR exports, transcribes speech with whisper.cpp, and makes years of conversations searchable. Nothing leaves your machine.",
   "scripts": {
     "setup": "node scripts/setup.mjs",

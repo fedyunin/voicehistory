@@ -41,7 +41,7 @@ protocol.registerSchemesAsPrivileged([{
 let paths, abs, hasRoot, bus, progress, db, runner, lock, appsettings, session, archive, config,
     maintenance, list, recording, contacts, years,
     importFiles, transcribePending, retranscribe, scanInbox, backfillProps, reindex, modelAvailable,
-    vcardsToOverrides, choices, matchPlan, tools, models, abort, about;
+    vcardsToOverrides, choices, matchPlan, tools, models, abort, about, review;
 
 async function loadCore() {
   const m = async (p) => import(pathToFileURL(path.join(HERE, '..', 'core', p)).href);
@@ -64,6 +64,7 @@ async function loadCore() {
   tools = await m('tools.js');
   models = await m('models.js');
   about = await m('about.js');
+  review = await m('review.js');
   abort = await m('abort.js');
 }
 
@@ -115,6 +116,8 @@ function startModelDownload() {
 const API = {
   /* --- archive --- */
   archive: () => session.archiveState(),
+
+  review: () => ({ reasons: review.counts() }),
 
   about: () => ({
     ...about.info(),
@@ -176,6 +179,7 @@ const API = {
     contactId: p.contact ? Number(p.contact) : null,
     year: p.year || null,
     source: p.source || null,
+    review: p.review || null,
     offset: Number(p.offset ?? 0),
     limit: Number(p.limit ?? 60),
   }),
@@ -211,12 +215,15 @@ const API = {
     }));
   },
   /** Redo one recording, or the whole archive when no id is given. */
-  'transcribe/again': ({ id }) => {
+  'transcribe/again': ({ id, review: reason }) => {
     if (!models.available()) {
       return { error: `Model ${config.MODEL} is not downloaded — open Setup to fetch it`, needsModel: true };
     }
+    // A whole review category at once: finding 188 doubtful recordings is only
+    // half the point, and re-running them one at a time is not the other half.
+    const ids = reason ? review.ids(reason) : id ? [Number(id)] : null;
     return runner.start('transcribe', () => retranscribe({
-      ids: id ? [Number(id)] : null,
+      ids,
       shouldStop: runner.isCancelled,
     }));
   },

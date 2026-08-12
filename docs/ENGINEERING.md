@@ -310,6 +310,29 @@ means distributing someone else's software under GPL/LGPL obligations, from
 sources that differ per platform, with checksums to verify. That is an installer,
 not a feature.
 
+## Finding what recognition got wrong
+
+Recognition does not fail loudly. For a recording it made nothing of it returns
+something plausible: one line for an hour of speech, a stage direction instead
+of a conversation, an unbroken lowercase run. None of that is an error anywhere
+in the pipeline, so nothing surfaces it, and in 5,398 recordings nobody finds
+them by scrolling.
+
+`core/review.js` names the shapes worth doubting — a failed run, a collapsed
+decode, minutes of audio yielding two phrases, a long call with almost no words,
+and silence claimed for a recording long enough that the claim deserves checking.
+On the archive this was built against: 5, 28, 24 and 188 recordings, the last
+covering 46 hours.
+
+They are SQL fragments rather than a stored flag, deliberately. These rules will
+be wrong at first and want tuning, and a rule that lives in a query can be
+changed without re-transcribing or reindexing anything.
+
+It is a filter over the ordinary list rather than a screen of its own, so
+opening a recording, reading it and re-running it all work already — and the
+filter bar can re-run the whole category, since finding 188 doubtful recordings
+is only half of the job.
+
 ## Progress inside one recording
 
 Most of this archive's time is not in many files but in long ones: 308 of its

@@ -21,6 +21,7 @@ import { modelAvailable } from '../core/transcribe.js';
 import * as tools from '../core/tools.js';
 import * as models from '../core/models.js';
 import * as about from '../core/about.js';
+import * as review from '../core/review.js';
 import * as abort from '../core/abort.js';
 import { vcardsToOverrides } from '../core/contactbook.js';
 import * as maintenance from '../core/maintenance.js';
@@ -136,6 +137,9 @@ async function api(req, res, url) {
     case 'archive':
       return json(res, 200, session.archiveState());
 
+    case 'review':
+      return json(res, 200, { reasons: review.counts() });
+
     case 'about':
       return json(res, 200, { ...about.info(), shell: 'browser' });
 
@@ -199,6 +203,7 @@ async function api(req, res, url) {
         contactId: q.get('contact') ? Number(q.get('contact')) : null,
         year: q.get('year') || null,
         source: q.get('source') || null,
+        review: q.get('review') || null,
         offset: Number(q.get('offset') ?? 0),
         limit: Number(q.get('limit') ?? 60),
       }));
@@ -250,12 +255,16 @@ async function api(req, res, url) {
     }
 
     case 'transcribe/again': {
+      // Once: the request body is a stream and does not rewind.
+      const { id, review: reason } = await readJson(req);
       if (!models.available()) {
         return json(res, 409, { error: `Model ${config.MODEL} is not downloaded — open Setup to fetch it`, needsModel: true });
       }
-      const { id } = await readJson(req);
+      // A whole review category at once: finding 188 doubtful recordings is only
+      // half the point, and re-running them one at a time is not the other half.
+      const ids = reason ? review.ids(reason) : id ? [Number(id)] : null;
       return json(res, 200, runner.start('transcribe', () => retranscribe({
-        ids: id ? [Number(id)] : null, shouldStop: runner.isCancelled,
+        ids, shouldStop: runner.isCancelled,
       })));
     }
 

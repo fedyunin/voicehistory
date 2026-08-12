@@ -10,7 +10,7 @@ const el = (tag, cls, html) => {
   return n;
 };
 
-const state = { q: '', stems: [], contactId: null, contactName: null, year: null, offset: 0, total: 0,
+const state = { q: '', stems: [], contactId: null, contactName: null, year: null, review: null, reviewLabel: null, offset: 0, total: 0,
                 currentId: null, segments: [], hits: [], hitAt: 0 };
 
 /* ======================= boot ======================= */
@@ -81,7 +81,25 @@ async function refreshStats() {
 }
 
 async function loadSidebar() {
-  const [ys, cs] = await Promise.all([api.years(), api.contacts()]);
+  const [ys, cs, rev] = await Promise.all([api.years(), api.contacts(), api.review().catch(() => null)]);
+
+  // Recognition does not fail loudly: it returns one line for an hour of speech
+  // as readily as a real transcript. Nobody finds those by scrolling 5,000
+  // recordings, so the archive has to point at them.
+  const rl = $('review');
+  rl.replaceChildren();
+  $('review-box').hidden = !rev?.reasons?.length;
+  for (const r of rev?.reasons ?? []) {
+    const li = el('li', state.review === r.key ? 'on' : '');
+    li.title = `${r.hint} — ${fmtDur(r.ms)} of audio`;
+    li.append(el('span', 'name', r.label), el('span', 'n', r.n));
+    li.onclick = () => {
+      state.review = state.review === r.key ? null : r.key;
+      state.reviewLabel = state.review ? r.label : null;
+      refilter();
+    };
+    rl.append(li);
+  }
 
   const yl = $('years');
   yl.replaceChildren();
@@ -135,9 +153,30 @@ function renderFilters() {
     });
   }
   if (state.q) active.push({ label: `“${state.q}”`, clear: () => { $('q').value = ''; state.q = ''; } });
+  if (state.review) {
+    active.push({
+      label: state.reviewLabel ?? 'needs review',
+      clear: () => { state.review = null; state.reviewLabel = null; },
+    });
+  }
 
   box.hidden = active.length === 0;
   if (!active.length) return;
+
+  if (state.review) {
+    const again = el('button', 'small', `Transcribe these ${state.total} again`);
+    again.title = 'Discards their transcripts and recognizes them from the audio again';
+    again.onclick = guard(async () => {
+      // Everything destructive here says what it costs before doing it. This
+      // discards work: the transcripts go, and recognition runs for as long as
+      // the audio takes.
+      if (!confirm(`Discard the transcripts of these ${state.total} recordings and recognize them again?`)) return;
+      again.disabled = true;
+      const r = await api.transcribeAgain(null, state.review);
+      if (r?.error) offerSetup(r.error, r.needsModel);
+    });
+    box.append(again);
+  }
 
   box.append(el('span', 'muted tiny', 'Showing only'));
   for (const f of active) {
@@ -177,11 +216,16 @@ async function loadList(reset, keepPlace = false) {
     q: state.q,
     contact: state.contactId,
     year: state.year,
+    review: state.review,
     offset: keepPlace ? 0 : state.offset,
     limit: keepPlace ? Math.max(PAGE, loaded) : PAGE,
   });
   state.total = r.total;
   state.stems = r.stems ?? [];
+  // Again, now that the count is known: the filter bar names how many recordings
+  // an action would touch, and naming the previous filter's count is worse than
+  // naming none.
+  renderFilters();
 
   const ul = $('calls');
   if (reset || keepPlace) ul.replaceChildren();

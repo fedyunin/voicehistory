@@ -2,6 +2,7 @@
 // the HTTP server calls them today, ipcMain would call them under Electron, and
 // neither shell adds any logic of its own.
 import { open, customNames } from './db.js';
+import { whereFor } from './review.js';
 
 const PAGE = 50;
 
@@ -35,13 +36,18 @@ export function years() {
  * Recording list with filters. When q is present the query goes through FTS5
  * and each row carries a highlighted snippet.
  */
-export function list({ q = '', contactId = null, year = null, source = null, offset = 0, limit = PAGE } = {}) {
+export function list({ q = '', contactId = null, year = null, source = null, review = null, offset = 0, limit = PAGE } = {}) {
   const d = open();
   const where = [];
   const args = {};
   if (contactId) { where.push('r.contact_id = @contactId'); args.contactId = contactId; }
   if (year) { where.push("substr(r.started_at,1,4) = @year"); args.year = String(year); }
   if (source) { where.push('r.source = @source'); args.source = source; }
+  // Doubtful recordings are a filter over the same list rather than a screen of
+  // their own: everything that makes the list useful — opening one, reading it,
+  // re-running it — already exists here.
+  const reviewWhere = review ? whereFor(review) : null;
+  if (reviewWhere) where.push(`(${reviewWhere})`);
 
   const base = `
     FROM recordings r
@@ -59,7 +65,7 @@ export function list({ q = '', contactId = null, year = null, source = null, off
            c.display_name AS contact, c.id AS contact_id
            ${q ? ", snippet(fts, 0, '<mark>', '</mark>', '…', 12) AS snippet, bm25(fts) AS rank" : ''}
     ${base}
-    ORDER BY ${q ? 'rank' : 'r.started_at DESC'}
+    ORDER BY ${q ? 'rank' : review ? 'r.duration_ms DESC' : 'r.started_at DESC'}
     LIMIT @limit OFFSET @offset
   `).all({ ...args, limit, offset });
 
