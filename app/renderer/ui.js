@@ -272,7 +272,9 @@ function renderFilters() {
   box.append(all);
 }
 
-const PAGE = 60;
+// Larger than a web app would use: the database is a file on the same disk, so a
+// page costs a millisecond rather than a network round trip.
+const PAGE = 150;
 
 /**
  * @param {boolean} reset  start again from the first page
@@ -312,7 +314,7 @@ async function loadList(reset, keepPlace = false) {
   $('list-head').textContent = state.q
     ? `${r.total} matches — showing ${shown}`
     : `${r.total} recordings${state.year ? ` in ${state.year}` : ''}`;
-  $('more').hidden = shown >= r.total;
+  $('sentinel').hidden = shown >= r.total;
   $('clear').hidden = !state.q;
 }
 
@@ -796,7 +798,16 @@ function wire() {
     t = setTimeout(() => { state.q = v; renderFilters(); loadList(true); }, 220);
   };
   $('clear').onclick = () => { $('q').value = ''; state.q = ''; renderFilters(); loadList(true); };
-  $('more').onclick = () => { state.offset += PAGE; loadList(false); };
+  // No button. Reaching the end of the list is the request to see more of it —
+  // there is nothing for a "load more" to mean when the data is a local file.
+  const io = new IntersectionObserver((entries) => {
+    if (!entries.some((e) => e.isIntersecting)) return;
+    if (loadingMore || $('sentinel').hidden) return;
+    loadingMore = true;
+    state.offset += PAGE;
+    loadList(false).finally(() => { loadingMore = false; });
+  }, { root: document.querySelector('.middle'), rootMargin: '400px' });
+  io.observe($('sentinel'));
 
   $('btn-import').onclick = guard(openImport);
   $('imp-cancel').onclick = () => $('dlg-import').close();
@@ -1324,6 +1335,7 @@ function onProgress(p) {
   showProgress({ kind: p.phase, done: p.done, total: p.total, file: p.file, fileMs: p.fileMs, filePercent: p.filePercent });
 }
 
+let loadingMore = false;
 let refreshTimer = null;
 let tickTimer = null;
 let jobStartedAt = null;

@@ -427,3 +427,7 @@ button.backlink:hover { color: var(--accent); }
 .heat-cell.blank { background: none; }
 .heat-cell.on { outline: 1.5px solid var(--ink); outline-offset: 1px; }
 .heat-cell:not(.none):hover { outline: 1.5px solid var(--accent); outline-offset: 1px; }
+
+.sentinel {
+  padding: 14px 16px 28px; color: var(--muted); font-size: 12.5px; text-align: center;
+}
