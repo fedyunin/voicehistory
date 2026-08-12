@@ -404,3 +404,9 @@ button.linkish {
 .words-row { grid-template-columns: 52px 1fr; cursor: default; align-items: baseline; }
 .words-row:hover { background: none; }
 .words { color: var(--ink); font-size: 13px; line-height: 1.5; }
+
+button.backlink {
+  border: 0; background: none; padding: 10px 0 0; margin: 0;
+  color: var(--muted); font: inherit; font-size: 12.5px; cursor: pointer;
+}
+button.backlink:hover { color: var(--accent); }

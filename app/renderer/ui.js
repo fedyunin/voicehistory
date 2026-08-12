@@ -124,9 +124,6 @@ async function loadSidebar() {
     li.onclick = () => {
       state.contactName = state.contactName === c.name ? null : c.name;
       refilter();
-      // Selecting a person shows who they are, not just their calls. Deselecting
-      // goes back to the archive as a whole.
-      if (state.contactName) showPerson(state.contactName); else showOverview();
     };
     cl.append(li);
   }
@@ -137,6 +134,40 @@ function refilter() {
   renderFilters();
   loadSidebar();
   loadList(true);
+  syncDetail();
+}
+
+/**
+ * The right-hand pane follows the filters, always.
+ *
+ * It used to be set only where a click happened, so removing a person's filter
+ * left their panel standing and the only way back to the archive was clicking
+ * the logo — which nothing advertised. One function decides it instead: whatever
+ * is selected is what is shown.
+ */
+function syncDetail() {
+  state.currentId = null;
+  if (state.contactName) showPerson(state.contactName);
+  else showOverview();
+}
+
+/** Back to the whole archive, from any combination of filters. */
+function clearFilters() {
+  state.year = null;
+  state.contactId = null;
+  state.contactName = null;
+  state.review = null;
+  state.reviewLabel = null;
+  $('q').value = '';
+  state.q = '';
+  refilter();
+}
+
+/** A visible way back, at the top of whatever the pane is showing. */
+function backTo(label, fn) {
+  const b = el('button', 'backlink', `‹ ${label}`);
+  b.onclick = guard(fn);
+  return b;
 }
 
 /**
@@ -197,15 +228,13 @@ function renderFilters() {
     chip.onclick = () => { f.clear(); refilter(); };
     box.append(chip);
   }
-  if (active.length > 1) {
-    const all = el('button', 'small ghost', 'Show all');
-    all.onclick = () => {
-      state.year = null; state.contactId = null; state.contactName = null;
-      $('q').value = ''; state.q = '';
-      refilter();
-    };
-    box.append(all);
-  }
+  // Offered whenever anything is narrowing the list, not only when two things
+  // are: with one filter active there was no single control that undid it and
+  // returned to the archive.
+  const all = el('button', 'small ghost', 'Show everything');
+  all.title = 'Clear all filters and go back to the whole archive';
+  all.onclick = guard(() => clearFilters());
+  box.append(all);
 }
 
 const PAGE = 60;
@@ -317,6 +346,7 @@ async function showPerson(name) {
   for (const li of $('calls').children) li.classList.remove('on');
 
   d.replaceChildren();
+  d.append(backTo('Your archive', () => clearFilters()));
   d.append(el('h2', '', esc(p.name)));
 
   const t = p.totals;
@@ -521,6 +551,11 @@ async function openRecording(id) {
 
   const d = $('detail');
   d.replaceChildren();
+  // Where this came from, and how to get back there. Opening a recording used to
+  // be a one-way door: the pane was replaced and nothing said what replaced it.
+  d.append(state.contactName
+    ? backTo(state.contactName, () => showPerson(state.contactName))
+    : backTo('Your archive', () => showOverview()));
   d.append(el('h2', '', esc(rec.contact ?? '—')));
 
   const bits = [fmtWhenFull(rec.started_at), fmtDur(rec.duration_ms)];
@@ -685,9 +720,19 @@ function wire() {
 
   $('btn-jobs').onclick = guard(async () => { await refreshStats(); $('dlg-jobs').showModal(); });
 
+  // Escape steps back one level, the way it does everywhere else.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || document.querySelector('dialog[open]')) return;
+    if (document.activeElement === $('q')) return;
+    if (state.currentId) syncDetail();
+    else if (state.contactName || state.year || state.review || state.q) clearFilters();
+  });
+
   // Clicking the name goes back to the archive as a whole — the only way back
   // out of a recording, and where people already reach for "home".
-  document.querySelector('.brand').onclick = guard(() => showOverview());
+  const brand = document.querySelector('.brand');
+  brand.title = 'Back to the whole archive';
+  brand.onclick = guard(() => clearFilters());
 
   $('btn-setup').onclick = guard(async () => { await loadSetup(); $('dlg-setup').showModal(); });
   $('setup-close').onclick = () => $('dlg-setup').close();
